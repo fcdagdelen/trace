@@ -6,6 +6,7 @@
   "letterSpacing": 0.012,
   "resonantSymbols": ["⊹", "⁂", "◈"],
   "vocabulary": ["pathosformel", "nachleben", "engram", "atlas", "gesture", "survival", "migration", "formula"],
+  "expandedVocabulary": ["survive", "migrate", "charge", "emotion", "gesture", "persist", "echo", "ancient", "modern", "image", "atlas", "body", "inherited", "form", "charged", "travel", "century", "relief", "painting", "expression", "memory", "collective"],
   "domains": ["image", "gesture", "history", "memory", "affect", "culture"],
   "compatibleWith": ["barthes", "benjamin", "calasso"],
   "tensionsWith": ["wittgenstein", "grothendieck"],

@@ -7,6 +7,12 @@ import { buildSystemPrompt } from '$lib/prompts/system';
 import { getMethods, type Method } from '$lib/methods';
 import { isTransitionalSymbol } from '$lib/utils/symbols';
 import { calculateDelay, detectClosing, type PacingContext } from '$lib/utils/pacing';
+import {
+  detectActiveSpirit,
+  createDetectionState,
+  updateDetectionState,
+  type DetectionState,
+} from '$lib/utils/detection';
 import type { TraceLineInsert } from '$lib/types/database';
 import { getSupabaseAdmin } from '$lib/services/supabase-admin';
 
@@ -166,6 +172,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
           isClosing: false,
           methodShifting: false,
         };
+        // Multi-signal spirit detection state
+        let detectionState: DetectionState = createDetectionState();
 
         const generator = streamMessage({
           system: systemPrompt,
@@ -186,7 +194,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
             // Detect if this is a symbol
             const isSymbol = isTransitionalSymbol(line);
-            if (isSymbol) symbolCount++;
+            if (isSymbol) {
+              symbolCount++;
+              // Set recent symbol for next line's detection
+              detectionState = { ...detectionState, recentSymbol: line.trim() };
+            }
 
             // Update pacing context
             if (isSymbol) {
@@ -200,10 +212,20 @@ export const POST: RequestHandler = async ({ request, locals }) => {
               pacingContext.isClosing = true;
             }
 
-            // Detect method hints based on vocabulary
-            const methodHint = detectMethodHint(line, methods);
+            // Multi-signal spirit detection
+            const detectionResult = detectActiveSpirit(line, methods, detectionState);
+            const methodHint = detectionResult.id;
+
+            // Update detection state for next iteration
+            detectionState = updateDetectionState(detectionState, line, detectionResult, methods);
+
+            // Track for dominant method calculation
             if (methodHint) {
               methodHintCounts[methodHint] = (methodHintCounts[methodHint] || 0) + 1;
+              // Flag method shift for pacing
+              pacingContext.methodShifting = true;
+            } else {
+              pacingContext.methodShifting = false;
             }
 
             // Build SSE event
@@ -343,34 +365,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     },
   });
 };
-
-// Detect which method might be active based on vocabulary
-// Requires 2+ vocabulary matches to reduce false positives, or 1 match for longer/rarer terms
-function detectMethodHint(line: string, methods: Method[]): string | null {
-  const lower = line.toLowerCase();
-
-  let bestMatch: { id: string; score: number } | null = null;
-
-  for (const method of methods) {
-    let score = 0;
-
-    for (const word of method.vocabulary) {
-      const wordLower = word.toLowerCase();
-      if (lower.includes(wordLower)) {
-        // Weight longer words more heavily (more specific)
-        const wordScore = wordLower.length >= 8 ? 2 : 1;
-        score += wordScore;
-      }
-    }
-
-    // Require minimum score of 2 (either 2 short words or 1 long/specific word)
-    if (score >= 2 && (!bestMatch || score > bestMatch.score)) {
-      bestMatch = { id: method.id, score };
-    }
-  }
-
-  return bestMatch?.id ?? null;
-}
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));

@@ -6,6 +6,7 @@
   "letterSpacing": 0.022,
   "resonantSymbols": ["⟡", "◈", "∿"],
   "vocabulary": ["topos", "morphism", "structure", "motif", "descent", "rising sea", "yoga", "functor"],
+  "expandedVocabulary": ["expand", "dissolve", "context", "natural", "structure", "transform", "perspective", "patience", "sea", "rise", "setting", "abstract", "nut", "soften", "visible", "essential", "geometry", "space", "recover", "level"],
   "domains": ["structure", "abstraction", "mathematics", "vision", "unification", "patience"],
   "compatibleWith": ["deleuze", "derrida"],
   "tensionsWith": ["warburg", "simmel", "ibn-khaldun"],

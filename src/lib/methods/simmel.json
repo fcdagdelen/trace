@@ -6,6 +6,7 @@
   "letterSpacing": 0.016,
   "resonantSymbols": ["◌", "⟡", "∘"],
   "vocabulary": ["stranger", "form", "interaction", "objectivity", "distance", "nearness", "tragedy of culture", "sociability"],
+  "expandedVocabulary": ["stranger", "near", "far", "distance", "form", "relation", "interact", "position", "objective", "geometry", "social", "secret", "bridge", "door", "miser", "adventure", "crystallize", "alien", "tragedy", "culture"],
   "domains": ["relation", "distance", "form", "modernity", "culture", "social"],
   "compatibleWith": ["wittgenstein", "barthes"],
   "tensionsWith": ["grothendieck", "deleuze"],

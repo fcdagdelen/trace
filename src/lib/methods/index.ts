@@ -8,6 +8,7 @@ export interface Method {
   letterSpacing: number;
   resonantSymbols: string[];
   vocabulary: string[];
+  expandedVocabulary?: string[]; // broader semantic field words for detection
   domains: string[];
   compatibleWith: string[];
   tensionsWith: string[];

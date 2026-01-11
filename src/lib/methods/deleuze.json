@@ -6,6 +6,7 @@
   "letterSpacing": 0.008,
   "resonantSymbols": ["∿", "⋮", "∘"],
   "vocabulary": ["rhizome", "assemblage", "deterritorialization", "plateau", "line of flight", "multiplicity", "becoming", "intensity"],
+  "expandedVocabulary": ["connect", "flow", "escape", "transform", "multiply", "middle", "vector", "territory", "desire", "machine", "line", "network", "intensity", "map", "copy", "heterogeneous", "function", "charge", "pressure", "becoming"],
   "domains": ["structure", "flow", "escape", "multiplicity", "becoming", "desire"],
   "compatibleWith": ["bateson", "grothendieck"],
   "tensionsWith": ["barthes", "benjamin", "wittgenstein"],

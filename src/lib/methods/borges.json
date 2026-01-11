@@ -6,6 +6,7 @@
   "letterSpacing": 0.017,
   "resonantSymbols": ["⋮", "◈", "∿"],
   "vocabulary": ["labyrinth", "infinite", "mirror", "tiger", "time", "library", "garden of forking paths", "dream"],
+  "expandedVocabulary": ["mirror", "infinite", "branch", "fork", "center", "contain", "dream", "tiger", "library", "labyrinth", "version", "parallel", "regress", "vertiginous", "universe", "encyclopedia", "territory", "map", "forget", "haunt"],
   "domains": ["infinity", "recursion", "time", "literature", "dream", "identity"],
   "compatibleWith": ["derrida", "calasso"],
   "tensionsWith": ["ibn-khaldun", "bateson"],

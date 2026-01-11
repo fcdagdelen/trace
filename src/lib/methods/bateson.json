@@ -6,6 +6,7 @@
   "letterSpacing": 0.014,
   "resonantSymbols": ["◈", "†", "⋮"],
   "vocabulary": ["double-bind", "metacommunication", "schismogenesis", "ecology", "pattern", "learning", "logical type", "context"],
+  "expandedVocabulary": ["pattern", "context", "relationship", "level", "frame", "message", "learn", "circuit", "feedback", "system", "both", "trap", "bind", "punish", "perceive", "contradict", "spiral", "runaway", "relationship", "connect", "crab", "lobster"],
   "domains": ["system", "paradox", "communication", "ecology", "learning", "relationship"],
   "compatibleWith": ["deleuze", "wittgenstein"],
   "tensionsWith": ["benjamin", "calasso"],
