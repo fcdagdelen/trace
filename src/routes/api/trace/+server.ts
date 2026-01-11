@@ -113,10 +113,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     .single();
 
   if (traceError) {
-    console.error('Failed to create trace:', traceError);
+    console.error('Failed to create trace:', JSON.stringify(traceError, null, 2));
     persistenceError = traceError.message;
   } else {
     traceId = traceData.id;
+    console.log('[trace] Created trace:', traceId);
   }
 
   // Store session with TTL tracking
