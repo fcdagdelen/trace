@@ -1,0 +1,104 @@
+/* trace - esoteric terminal */
+/* watch thought unfold */
+
+:root {
+  /* Colors - Deep dark terminal */
+  --bg-color: #0a0a0a;
+  --surface-color: #151515;
+  --border-color: #1f1f1f;
+  --text-color: #e8e8e8;
+  --muted-color: #6a6a6a;
+  --symbol-color: #8a8a8a;
+  --accent-color: #8aa4ff;
+
+  /* Typography - Fluid scale */
+  --font-mono: 'SF Mono', 'Monaco', 'Fira Code', 'Inconsolata', monospace;
+  --font-size-base: clamp(1.125rem, 1rem + 0.5vw, 1.375rem);
+  --font-size-sm: clamp(0.875rem, 0.8rem + 0.3vw, 1rem);
+  --font-size-lg: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
+
+  /* Spacing */
+  --line-height: 1.7;
+  --line-height-tight: 1.5;
+}
+
+/* High contrast mode */
+@media (prefers-contrast: more) {
+  :root {
+    --text-color: #ffffff;
+    --bg-color: #000000;
+    --border-color: #555555;
+    --muted-color: #888888;
+  }
+}
+
+/* Reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Base */
+html {
+  font-size: 100%; /* Respect user preferences */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height);
+  color: var(--text-color);
+  background: var(--bg-color);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Scrollbar - hidden but functional */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: none;
+}
+
+/* Selection */
+::selection {
+  background: var(--accent-color);
+  color: var(--bg-color);
+}
+
+/* Focus - subtle */
+:focus-visible {
+  outline: 1px solid var(--accent-color);
+  outline-offset: 1px;
+}
+
+/* Links */
+a {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
