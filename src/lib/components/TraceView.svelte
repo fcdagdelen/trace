@@ -17,6 +17,9 @@
   let typingId = $state<string | null>(null);
   let processedCount = 0;
 
+  // Instant mode: skip all animations and show all content immediately
+  let instantMode = $state(false);
+
   // Single effect: sync store lines to displayed lines
   $effect(() => {
     const storeLines = $traceStore.lines;
@@ -26,6 +29,18 @@
       processedCount = 0;
       displayedLines = [];
       typingId = null;
+      instantMode = false;
+      return;
+    }
+
+    // In instant mode, show all lines immediately
+    if (instantMode) {
+      if (storeLines.length > displayedLines.length) {
+        displayedLines = [...storeLines];
+        processedCount = storeLines.length;
+        typingId = null;
+        scrollToBottom();
+      }
       return;
     }
 
@@ -42,8 +57,27 @@
     }
   });
 
+  // Reveal all content instantly
+  function revealAll() {
+    instantMode = true;
+    typingId = null;
+    const storeLines = $traceStore.lines;
+    displayedLines = [...storeLines];
+    processedCount = storeLines.length;
+    scrollToBottom();
+  }
+
+  // Check if there's content being animated (for showing reveal button)
+  const hasAnimatingContent = $derived(
+    $traceStore.lines.length > displayedLines.length ||
+    typingId !== null
+  );
+
   // Called when a line finishes typing
   function handleLineComplete() {
+    // Skip if in instant mode
+    if (instantMode) return;
+
     typingId = null;
     scrollToBottom();
 
@@ -90,28 +124,36 @@
     {#if line.isSymbol}
       <TransitionSymbol
         symbol={line.content}
-        isNew={line.id === typingId}
-        onComplete={line.id === typingId ? handleLineComplete : undefined}
+        isNew={!instantMode && line.id === typingId}
+        onComplete={!instantMode && line.id === typingId ? handleLineComplete : undefined}
       />
     {:else}
       <TraceLineComponent
         content={line.content}
         methodHint={line.methodHint}
         depth={line.depth}
-        isNew={line.id === typingId}
-        onComplete={line.id === typingId ? handleLineComplete : undefined}
-        onProgress={line.id === typingId ? scrollToBottom : undefined}
-        showCursor={!line.isSymbol && typingId === null && index === displayedLines.length - 1 && $traceStore.isStreaming}
+        isNew={!instantMode && line.id === typingId}
+        onComplete={!instantMode && line.id === typingId ? handleLineComplete : undefined}
+        onProgress={!instantMode && line.id === typingId ? scrollToBottom : undefined}
+        showCursor={!instantMode && !line.isSymbol && typingId === null && index === displayedLines.length - 1 && $traceStore.isStreaming}
       />
     {/if}
   {/each}
 </div>
 
-{#if $traceStore.isStreaming && !$traceStore.isPaused}
-  <div class="hint">
-    <kbd>space</kbd> to pause
-  </div>
-{/if}
+<div class="hints">
+  {#if $traceStore.isStreaming && !$traceStore.isPaused && !instantMode}
+    <div class="hint">
+      <kbd>space</kbd> to pause
+    </div>
+  {/if}
+
+  {#if !instantMode && (hasAnimatingContent || $traceStore.isStreaming)}
+    <button class="reveal-btn" onclick={revealAll}>
+      reveal all
+    </button>
+  {/if}
+</div>
 
 <style>
   .trace-view {
@@ -137,11 +179,18 @@
     );
   }
 
-  .hint {
+  .hints {
     position: fixed;
     bottom: 2rem;
     left: 50%;
     transform: translateX(-50%);
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    z-index: 10;
+  }
+
+  .hint {
     font-family: var(--font-mono);
     font-size: var(--font-size-sm, 0.875rem);
     color: var(--muted-color, #444);
@@ -149,10 +198,25 @@
     padding: 0.5rem 1rem;
     border: 1px solid var(--border-color, #222);
     opacity: 0.9;
-    z-index: 10;
   }
 
   .hint kbd {
     color: var(--text-color, #888);
+  }
+
+  .reveal-btn {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm, 0.875rem);
+    color: var(--muted-color, #555);
+    background: var(--bg-color, #0d0d0d);
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color, #222);
+    cursor: pointer;
+    transition: color 150ms, border-color 150ms;
+  }
+
+  .reveal-btn:hover {
+    color: var(--text-color, #e8e6e3);
+    border-color: var(--muted-color, #444);
   }
 </style>

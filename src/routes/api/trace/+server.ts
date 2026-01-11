@@ -9,14 +9,61 @@ import { isTransitionalSymbol } from '$lib/utils/symbols';
 import { calculateDelay, detectClosing, type PacingContext } from '$lib/utils/pacing';
 import type { TraceLineInsert } from '$lib/types/database';
 
-// In-memory session store (for active streams)
-const sessions = new Map<string, {
+// Session with TTL for cleanup
+interface Session {
   query: string;
   methods: Method[];
   trace: string;
   injections: string[];
   traceId: string | null;
-}>();
+  createdAt: number;
+  lastActivity: number;
+}
+
+// In-memory session store with TTL-based cleanup
+const sessions = new Map<string, Session>();
+
+// Session TTL: 30 minutes of inactivity
+const SESSION_TTL_MS = 30 * 60 * 1000;
+// Cleanup interval: every 5 minutes
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+
+// Cleanup stale sessions
+function cleanupStaleSessions(): void {
+  const now = Date.now();
+  let cleaned = 0;
+
+  for (const [sessionId, session] of sessions.entries()) {
+    if (now - session.lastActivity > SESSION_TTL_MS) {
+      sessions.delete(sessionId);
+      cleaned++;
+    }
+  }
+
+  if (cleaned > 0) {
+    console.log(`[session-cleanup] Removed ${cleaned} stale sessions. Active: ${sessions.size}`);
+  }
+}
+
+// Start cleanup interval (runs once per process)
+let cleanupInterval: ReturnType<typeof setInterval> | null = null;
+function ensureCleanupInterval(): void {
+  if (!cleanupInterval) {
+    cleanupInterval = setInterval(cleanupStaleSessions, CLEANUP_INTERVAL_MS);
+    // Don't prevent process exit
+    if (cleanupInterval.unref) {
+      cleanupInterval.unref();
+    }
+  }
+}
+
+// Touch session to update last activity
+function touchSession(sessionId: string): void {
+  const session = sessions.get(sessionId);
+  if (session) {
+    session.lastActivity = Date.now();
+  }
+}
 
 export const POST: RequestHandler = async ({ request, locals }) => {
   const { query, methodIds, sessionId } = await request.json();
@@ -61,14 +108,20 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     }
   }
 
-  // Store session
+  // Store session with TTL tracking
+  const now = Date.now();
   sessions.set(sessionId, {
     query,
     methods,
     trace: '',
     injections: [],
     traceId,
+    createdAt: now,
+    lastActivity: now,
   });
+
+  // Ensure cleanup interval is running
+  ensureCleanupInterval();
 
   const systemPrompt = buildSystemPrompt(methods);
 
@@ -142,10 +195,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             const sseData = `data: ${JSON.stringify(event)}\n\n`;
             controller.enqueue(encoder.encode(sseData));
 
-            // Update session trace
+            // Update session trace and touch for activity
             const sessionData = sessions.get(sessionId);
             if (sessionData) {
               sessionData.trace += line + '\n';
+              sessionData.lastActivity = Date.now();
             }
 
             // Queue line for batch insert
@@ -221,11 +275,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             .eq('id', traceId);
         }
 
+        // Clean up completed session
+        sessions.delete(sessionId);
+
         // Send completion event
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'complete' })}\n\n`));
         controller.close();
       } catch (error) {
         console.error('Stream error:', error);
+        // Clean up failed session
+        sessions.delete(sessionId);
         const errorEvent = { type: 'error', message: 'Stream failed' };
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
         controller.close();
@@ -243,20 +302,31 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 };
 
 // Detect which method might be active based on vocabulary
+// Requires 2+ vocabulary matches to reduce false positives, or 1 match for longer/rarer terms
 function detectMethodHint(line: string, methods: Method[]): string | null {
   const lower = line.toLowerCase();
 
-  for (const method of methods) {
-    const matchCount = method.vocabulary.filter(word =>
-      lower.includes(word.toLowerCase())
-    ).length;
+  let bestMatch: { id: string; score: number } | null = null;
 
-    if (matchCount >= 1) {
-      return method.id;
+  for (const method of methods) {
+    let score = 0;
+
+    for (const word of method.vocabulary) {
+      const wordLower = word.toLowerCase();
+      if (lower.includes(wordLower)) {
+        // Weight longer words more heavily (more specific)
+        const wordScore = wordLower.length >= 8 ? 2 : 1;
+        score += wordScore;
+      }
+    }
+
+    // Require minimum score of 2 (either 2 short words or 1 long/specific word)
+    if (score >= 2 && (!bestMatch || score > bestMatch.score)) {
+      bestMatch = { id: method.id, score };
     }
   }
 
-  return null;
+  return bestMatch?.id ?? null;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -276,6 +346,7 @@ export const PATCH: RequestHandler = async ({ request }) => {
   }
 
   session.injections.push(injection);
+  session.lastActivity = Date.now();
 
   return new Response(JSON.stringify({ success: true }), {
     headers: { 'Content-Type': 'application/json' },

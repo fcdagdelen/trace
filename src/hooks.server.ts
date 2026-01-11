@@ -3,6 +3,20 @@ import { createServerClient } from '@supabase/ssr';
 import { type Handle, redirect } from '@sveltejs/kit';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 import type { Database } from '$lib/types/database';
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  rateLimitHeaders,
+  type RateLimitType,
+} from '$lib/utils/rate-limit';
+
+// Map API paths to rate limit types
+function getRateLimitType(pathname: string): RateLimitType | null {
+  if (pathname === '/api/trace') return 'trace';
+  if (pathname === '/api/analyze') return 'analyze';
+  if (pathname.startsWith('/api/')) return 'api';
+  return null;
+}
 
 export const handle: Handle = async ({ event, resolve }) => {
   // Create Supabase client with cookie handling
@@ -43,6 +57,37 @@ export const handle: Handle = async ({ event, resolve }) => {
     if (!session) {
       throw redirect(303, '/auth');
     }
+  }
+
+  // Apply rate limiting to API routes
+  const rateLimitType = getRateLimitType(event.url.pathname);
+  if (rateLimitType) {
+    // Use user ID if authenticated, otherwise use IP
+    const session = await event.locals.getSession();
+    const identifier = session?.user?.id ??
+      event.getClientAddress() ??
+      'anonymous';
+
+    const result = checkRateLimit(rateLimitType, identifier);
+
+    if (!result.allowed) {
+      return rateLimitResponse(rateLimitType, result);
+    }
+
+    // Add rate limit headers to response
+    const response = await resolve(event, {
+      filterSerializedResponseHeaders(name) {
+        return name === 'content-range';
+      },
+    });
+
+    // Add rate limit headers
+    const headers = rateLimitHeaders(rateLimitType, result);
+    for (const [key, value] of Object.entries(headers)) {
+      response.headers.set(key, value);
+    }
+
+    return response;
   }
 
   // Allow /auth and /auth/callback without authentication
