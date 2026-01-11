@@ -22,6 +22,9 @@ export function getSupabaseAdmin(): SupabaseClient<Database> {
         autoRefreshToken: false,
         persistSession: false,
       },
+      db: {
+        schema: 'public',
+      },
     });
   }
   return _supabaseAdmin;

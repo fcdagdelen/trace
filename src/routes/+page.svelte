@@ -22,6 +22,7 @@
     getRecoveryAge,
     type RecoveryData,
   } from '$lib/utils/recovery';
+  import { version } from '$app/environment';
 
   const supabase = createSupabaseBrowserClient();
 
@@ -274,7 +275,7 @@
 
 <div class="terminal">
   <header class="header">
-    <span class="title">trace</span>
+    <span class="title">trace <span class="version">v{version}</span></span>
     <div class="header-actions">
       {#if $persistenceStore.status === 'saving'}
         <span class="persistence-indicator saving">saving...</span>
@@ -377,6 +378,12 @@
     color: var(--muted-color, #555);
     text-transform: lowercase;
     letter-spacing: 0.1em;
+  }
+
+  .version {
+    font-size: 0.65rem;
+    opacity: 0.4;
+    margin-left: 0.25rem;
   }
 
   .header-actions {
