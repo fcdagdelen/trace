@@ -8,6 +8,7 @@ import { getMethods, type Method } from '$lib/methods';
 import { isTransitionalSymbol } from '$lib/utils/symbols';
 import { calculateDelay, detectClosing, type PacingContext } from '$lib/utils/pacing';
 import type { TraceLineInsert } from '$lib/types/database';
+import { getSupabaseAdmin } from '$lib/services/supabase';
 
 // Session with TTL for cleanup
 interface Session {
@@ -93,12 +94,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     });
   }
 
-  // Create trace record in Supabase
+  // Create trace record in Supabase using admin client (bypasses RLS)
+  // We've already authenticated the user via locals.getSession() above
   let traceId: string | null = null;
   let persistenceError: string | null = null;
   const startTime = Date.now();
+  const supabaseAdmin = getSupabaseAdmin();
 
-  const { data: traceData, error: traceError } = await locals.supabase
+  const { data: traceData, error: traceError } = await supabaseAdmin
     .from('traces')
     .insert({
       user_id: userId,
@@ -135,7 +138,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   // Create SSE stream
   const encoder = new TextEncoder();
-  const supabase = locals.supabase;
   const stream = new ReadableStream({
     async start(controller) {
       try {
@@ -234,7 +236,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
               // Flush batch if full
               if (lineBatch.length >= BATCH_SIZE) {
-                const { error: batchError } = await supabase.from('trace_lines').insert(lineBatch);
+                const { error: batchError } = await supabaseAdmin.from('trace_lines').insert(lineBatch);
                 if (batchError) {
                   console.error('Batch insert failed:', batchError);
                   insertErrors.push(batchError.message);
@@ -276,7 +278,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
         // Flush remaining lines
         if (traceId && lineBatch.length > 0) {
-          const { error: finalBatchError } = await supabase.from('trace_lines').insert(lineBatch);
+          const { error: finalBatchError } = await supabaseAdmin.from('trace_lines').insert(lineBatch);
           if (finalBatchError) {
             console.error('Final batch insert failed:', finalBatchError);
             insertErrors.push(finalBatchError.message);
@@ -289,7 +291,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
           const dominantMethod = Object.entries(methodHintCounts)
             .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 
-          const { error: updateError } = await supabase
+          const { error: updateError } = await supabaseAdmin
             .from('traces')
             .update({
               completed_at: new Date().toISOString(),
