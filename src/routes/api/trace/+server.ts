@@ -8,7 +8,7 @@ import { getMethods, type Method } from '$lib/methods';
 import { isTransitionalSymbol } from '$lib/utils/symbols';
 import { calculateDelay, detectClosing, type PacingContext } from '$lib/utils/pacing';
 import type { TraceLineInsert } from '$lib/types/database';
-import { getSupabaseAdmin } from '$lib/services/supabase';
+import { getSupabaseAdmin } from '$lib/services/supabase-admin';
 
 // Session with TTL for cleanup
 interface Session {
