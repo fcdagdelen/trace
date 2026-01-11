@@ -51,7 +51,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     return session;
   };
 
-  // Protected routes - require authentication
+  // Protected page routes - require authentication (redirect to /auth)
   const protectedRoutes = ['/', '/history', '/trace'];
   const isProtectedRoute = protectedRoutes.some(
     (route) => event.url.pathname === route ||
@@ -63,6 +63,23 @@ export const handle: Handle = async ({ event, resolve }) => {
     const session = await event.locals.getSession();
     if (!session) {
       throw redirect(303, '/auth');
+    }
+  }
+
+  // Protected API routes - require authentication (return 401 JSON)
+  const protectedApiRoutes = ['/api/trace', '/api/traces', '/api/analyze'];
+  const isProtectedApiRoute = protectedApiRoutes.some(
+    (route) => event.url.pathname === route ||
+               event.url.pathname.startsWith(route + '/')
+  );
+
+  if (isProtectedApiRoute) {
+    const session = await event.locals.getSession();
+    if (!session) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
   }
 

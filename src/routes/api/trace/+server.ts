@@ -77,6 +77,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     });
   }
 
+  // Require authentication for trace persistence
+  if (!userId) {
+    return new Response(JSON.stringify({ error: 'Authentication required' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const methods = getMethods(methodIds);
   if (methods.length === 0) {
     return new Response(JSON.stringify({ error: 'No valid methods selected' }), {
@@ -87,25 +95,25 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   // Create trace record in Supabase
   let traceId: string | null = null;
+  let persistenceError: string | null = null;
   const startTime = Date.now();
 
-  if (userId) {
-    const { data: traceData, error: traceError } = await locals.supabase
-      .from('traces')
-      .insert({
-        user_id: userId,
-        query,
-        method_ids: methodIds,
-        started_at: new Date().toISOString(),
-      })
-      .select('id')
-      .single();
+  const { data: traceData, error: traceError } = await locals.supabase
+    .from('traces')
+    .insert({
+      user_id: userId,
+      query,
+      method_ids: methodIds,
+      started_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
 
-    if (traceError) {
-      console.error('Failed to create trace:', traceError);
-    } else {
-      traceId = traceData.id;
-    }
+  if (traceError) {
+    console.error('Failed to create trace:', traceError);
+    persistenceError = traceError.message;
+  } else {
+    traceId = traceData.id;
   }
 
   // Store session with TTL tracking
@@ -131,6 +139,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   const stream = new ReadableStream({
     async start(controller) {
       try {
+        // Send initial status event with persistence info
+        const statusEvent = {
+          type: 'status',
+          traceId,
+          persisted: !!traceId,
+          error: persistenceError,
+        };
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(statusEvent)}\n\n`));
+
         let buffer = '';
         let lineCount = 0;
         let symbolCount = 0;
@@ -138,6 +155,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         const methodHintCounts: Record<string, number> = {};
         const lineBatch: TraceLineInsert[] = [];
         const BATCH_SIZE = 5;
+        const insertErrors: string[] = [];
         const pacingContext: PacingContext = {
           consecutiveLines: 0,
           isClosing: false,
@@ -216,7 +234,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
               // Flush batch if full
               if (lineBatch.length >= BATCH_SIZE) {
-                await supabase.from('trace_lines').insert(lineBatch);
+                const { error: batchError } = await supabase.from('trace_lines').insert(lineBatch);
+                if (batchError) {
+                  console.error('Batch insert failed:', batchError);
+                  insertErrors.push(batchError.message);
+                }
                 lineBatch.length = 0;
               }
             }
@@ -254,7 +276,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
         // Flush remaining lines
         if (traceId && lineBatch.length > 0) {
-          await supabase.from('trace_lines').insert(lineBatch);
+          const { error: finalBatchError } = await supabase.from('trace_lines').insert(lineBatch);
+          if (finalBatchError) {
+            console.error('Final batch insert failed:', finalBatchError);
+            insertErrors.push(finalBatchError.message);
+          }
         }
 
         // Update trace with completion data
@@ -263,7 +289,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
           const dominantMethod = Object.entries(methodHintCounts)
             .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 
-          await supabase
+          const { error: updateError } = await supabase
             .from('traces')
             .update({
               completed_at: new Date().toISOString(),
@@ -273,13 +299,25 @@ export const POST: RequestHandler = async ({ request, locals }) => {
               dominant_method: dominantMethod,
             })
             .eq('id', traceId);
+
+          if (updateError) {
+            console.error('Trace update failed:', updateError);
+            insertErrors.push(updateError.message);
+          }
         }
 
         // Clean up completed session
         sessions.delete(sessionId);
 
-        // Send completion event
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'complete' })}\n\n`));
+        // Send completion event with persistence status
+        const completeEvent = {
+          type: 'complete',
+          traceId,
+          persisted: !!traceId && insertErrors.length === 0,
+          lineCount,
+          errors: insertErrors.length > 0 ? insertErrors : undefined,
+        };
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(completeEvent)}\n\n`));
         controller.close();
       } catch (error) {
         console.error('Stream error:', error);

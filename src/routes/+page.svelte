@@ -8,6 +8,7 @@
   import SymbolLegendModal from '$lib/components/SymbolLegendModal.svelte';
   import { traceStore } from '$lib/stores/trace';
   import { sessionStore } from '$lib/stores/session';
+  import { persistenceStore } from '$lib/stores/persistence';
   import { getDepthDirection } from '$lib/utils/symbols';
   import { exportToPdf } from '$lib/utils/export';
   import { createSupabaseBrowserClient } from '$lib/services/supabase';
@@ -158,12 +159,17 @@
           try {
             const data = JSON.parse(event.slice(6));
 
-            if (data.type === 'complete') {
+            if (data.type === 'status') {
+              // Initial persistence status from server
+              persistenceStore.start(data.traceId, data.error);
+            } else if (data.type === 'complete') {
               traceStore.complete();
               markTraceComplete();
               clearPartialTrace();
+              persistenceStore.complete(data.persisted, data.lineCount, data.errors);
             } else if (data.type === 'error') {
               traceStore.setError(data.message);
+              persistenceStore.fail(data.message);
             } else if (data.type === 'line' || data.type === 'symbol') {
               // Update depth based on symbol direction
               if (data.type === 'symbol') {
@@ -188,6 +194,7 @@
     } catch (error) {
       console.error('Trace error:', error);
       traceStore.setError(error instanceof Error ? error.message : 'Unknown error');
+      persistenceStore.fail(error instanceof Error ? error.message : 'Unknown error');
     }
   }
 
@@ -231,6 +238,7 @@
   function handleReset() {
     traceStore.reset();
     sessionStore.clear();
+    persistenceStore.reset();
     userQuery = '';
     currentDepth = 0;
     currentMethodIds = [];
@@ -268,6 +276,15 @@
   <header class="header">
     <span class="title">trace</span>
     <div class="header-actions">
+      {#if $persistenceStore.status === 'saving'}
+        <span class="persistence-indicator saving">saving...</span>
+      {:else if $persistenceStore.status === 'saved'}
+        <span class="persistence-indicator saved">saved</span>
+      {:else if $persistenceStore.status === 'failed' || $persistenceStore.status === 'partial'}
+        <span class="persistence-indicator failed" title={$persistenceStore.error || 'Failed to save'}>
+          {$persistenceStore.status === 'partial' ? 'partial save' : 'not saved'}
+        </span>
+      {/if}
       <button class="header-btn" onclick={() => showSymbolLegend = true} title="Symbol legend">?</button>
       <a href="/history" class="header-btn">history</a>
       {#if isActive}
@@ -539,5 +556,31 @@
 
   .recovery-btn.primary:hover {
     background: rgba(107, 138, 253, 0.1);
+  }
+
+  .persistence-indicator {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm, 0.875rem);
+    padding: 0.25rem 0.5rem;
+    border-radius: 3px;
+  }
+
+  .persistence-indicator.saving {
+    color: var(--muted-color, #666);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .persistence-indicator.saved {
+    color: #81c784;
+  }
+
+  .persistence-indicator.failed {
+    color: #e57373;
+    cursor: help;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
   }
 </style>

@@ -6,17 +6,41 @@
   import TransitionSymbol from '$lib/components/TransitionSymbol.svelte';
   import LegendHud from '$lib/components/LegendHud.svelte';
   import { exportToPdf } from '$lib/utils/export';
-  import type { Trace, TraceLine as TraceLineType } from '$lib/types/database';
+  import { getMethod } from '$lib/methods';
+  import type { Trace, TraceLine as TraceLineType, TraceInjection } from '$lib/types/database';
 
   let trace = $state<Trace | null>(null);
   let lines = $state<TraceLineType[]>([]);
+  let injections = $state<TraceInjection[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
 
   // Playback state
   let isReplaying = $state(false);
+  let isPaused = $state(false);
   let replayIndex = $state(0);
   let displayedLines = $state<TraceLineType[]>([]);
+
+  // Speed options: value is the multiplier for delay
+  const SPEED_OPTIONS = [
+    { label: '0.5x', value: 2 },
+    { label: '1x', value: 1 },
+    { label: '2x', value: 0.5 },
+    { label: '4x', value: 0.25 },
+  ];
+  let speedMultiplier = $state(1);
+
+  // Derive unique methods used in this trace
+  const usedMethods = $derived(() => {
+    const methodSet = new Set<string>();
+    lines.forEach(line => {
+      if (line.method_hint) methodSet.add(line.method_hint);
+    });
+    return Array.from(methodSet).map(id => ({
+      id,
+      method: getMethod(id),
+    })).filter(m => m.method);
+  });
 
   async function loadTrace() {
     const id = $page.params.id;
@@ -31,6 +55,7 @@
       const data = await response.json();
       trace = data.trace;
       lines = data.lines;
+      injections = data.injections || [];
       // Show all lines initially
       displayedLines = lines;
     } catch (e) {
@@ -44,6 +69,7 @@
     displayedLines = [];
     replayIndex = 0;
     isReplaying = true;
+    isPaused = false;
     // First line will be added by handleLineComplete being called initially
     if (lines.length > 0) {
       displayedLines = [lines[0]];
@@ -51,10 +77,19 @@
     }
   }
 
+  function togglePause() {
+    isPaused = !isPaused;
+    if (!isPaused && replayIndex < lines.length) {
+      // Resume by triggering next line
+      handleLineComplete();
+    }
+  }
+
   function handleLineComplete() {
-    if (!isReplaying || replayIndex >= lines.length) {
+    if (!isReplaying || isPaused || replayIndex >= lines.length) {
       if (replayIndex >= lines.length) {
         isReplaying = false;
+        isPaused = false;
       }
       return;
     }
@@ -66,7 +101,13 @@
 
   function stopReplay() {
     isReplaying = false;
+    isPaused = false;
     displayedLines = lines;
+  }
+
+  // Get injections that appear after a specific line
+  function getInjectionsAfterLine(sequence: number): TraceInjection[] {
+    return injections.filter(inj => inj.after_line_sequence === sequence);
   }
 
   function handleExport() {
@@ -115,11 +156,26 @@
     <div class="header-actions">
       {#if !loading && !error && lines.length > 0}
         {#if isReplaying}
+          <button class="header-btn" onclick={togglePause}>
+            {isPaused ? 'resume' : 'pause'}
+          </button>
           <button class="header-btn" onclick={stopReplay}>stop</button>
+          <div class="speed-controls">
+            {#each SPEED_OPTIONS as option}
+              <button
+                class="speed-btn"
+                class:active={speedMultiplier === option.value}
+                onclick={() => speedMultiplier = option.value}
+              >
+                {option.label}
+              </button>
+            {/each}
+          </div>
+          <span class="progress">{replayIndex}/{lines.length}</span>
         {:else}
           <button class="header-btn" onclick={startReplay}>replay</button>
+          <button class="header-btn" onclick={handleExport}>export</button>
         {/if}
-        <button class="header-btn" onclick={handleExport}>export</button>
       {/if}
     </div>
   </header>
@@ -152,6 +208,18 @@
         </div>
       </div>
 
+      <!-- Method Legend -->
+      {#if usedMethods().length > 0}
+        <div class="method-legend">
+          <span class="legend-label">methods:</span>
+          {#each usedMethods() as { id, method }}
+            <span class="legend-item" style="color: {method?.color || 'var(--muted-color)'}">
+              {method?.name || id}
+            </span>
+          {/each}
+        </div>
+      {/if}
+
       <div class="trace-view">
         {#each displayedLines as line, index (line.id)}
           {#if line.is_symbol}
@@ -169,6 +237,13 @@
               onComplete={isReplaying && index === displayedLines.length - 1 ? handleLineComplete : undefined}
             />
           {/if}
+          <!-- Show injections after this line -->
+          {#each getInjectionsAfterLine(line.sequence) as injection}
+            <div class="injection">
+              <span class="injection-marker">+</span>
+              <span class="injection-content">{injection.content}</span>
+            </div>
+          {/each}
         {/each}
       </div>
     {/if}
@@ -287,5 +362,87 @@
     min-height: 0;
     overflow-y: auto;
     padding-bottom: 4rem;
+  }
+
+  /* Speed controls */
+  .speed-controls {
+    display: flex;
+    gap: 0.25rem;
+    margin-left: 0.5rem;
+    padding-left: 0.5rem;
+    border-left: 1px solid var(--border-color);
+  }
+
+  .speed-btn {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--muted-color);
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    padding: 0.15rem 0.35rem;
+    cursor: pointer;
+    transition: color 150ms, border-color 150ms, background 150ms;
+  }
+
+  .speed-btn:hover {
+    color: var(--text-color);
+    border-color: var(--muted-color);
+  }
+
+  .speed-btn.active {
+    color: var(--text-color);
+    background: var(--surface-color);
+    border-color: var(--muted-color);
+  }
+
+  .progress {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--muted-color);
+    margin-left: 0.5rem;
+  }
+
+  /* Method legend */
+  .method-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.5rem 0;
+    margin-bottom: 1rem;
+    font-size: var(--font-size-sm);
+  }
+
+  .legend-label {
+    color: var(--muted-color);
+    opacity: 0.6;
+  }
+
+  .legend-item {
+    opacity: 0.8;
+  }
+
+  /* Injections */
+  .injection {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    margin: 0.5rem 0;
+    background: rgba(107, 138, 253, 0.05);
+    border-left: 2px solid var(--accent-color);
+    border-radius: 0 4px 4px 0;
+  }
+
+  .injection-marker {
+    color: var(--accent-color);
+    font-weight: 600;
+    opacity: 0.8;
+  }
+
+  .injection-content {
+    color: var(--text-color);
+    opacity: 0.9;
+    font-style: italic;
   }
 </style>

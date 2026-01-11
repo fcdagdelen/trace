@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { methods } from '$lib/methods';
   import type { Trace } from '$lib/types/database';
 
   type TracePreview = Pick<Trace, 'id' | 'query' | 'method_ids' | 'line_count' | 'symbol_count' | 'dominant_method' | 'total_duration_ms' | 'created_at'>;
@@ -11,12 +12,42 @@
   let offset = $state(0);
   const limit = 20;
 
+  // Filter state
+  let searchQuery = $state('');
+  let selectedMethod = $state('');
+  let dateFrom = $state('');
+  let dateTo = $state('');
+  let showFilters = $state(false);
+
+  // Debounced search
+  let searchTimeout: ReturnType<typeof setTimeout>;
+
+  function handleSearchInput(e: Event) {
+    const value = (e.target as HTMLInputElement).value;
+    searchQuery = value;
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      offset = 0;
+      loadTraces();
+    }, 300);
+  }
+
   async function loadTraces() {
     loading = true;
     error = null;
 
     try {
-      const response = await fetch(`/api/traces?limit=${limit}&offset=${offset}`);
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+        offset: offset.toString(),
+      });
+
+      if (searchQuery) params.set('search', searchQuery);
+      if (selectedMethod) params.set('method', selectedMethod);
+      if (dateFrom) params.set('from', dateFrom);
+      if (dateTo) params.set('to', dateTo);
+
+      const response = await fetch(`/api/traces?${params}`);
       if (!response.ok) {
         throw new Error('Failed to load traces');
       }
@@ -29,6 +60,23 @@
       loading = false;
     }
   }
+
+  function applyFilters() {
+    offset = 0;
+    loadTraces();
+  }
+
+  function clearFilters() {
+    searchQuery = '';
+    selectedMethod = '';
+    dateFrom = '';
+    dateTo = '';
+    offset = 0;
+    loadTraces();
+  }
+
+  // Check if any filters are active
+  const hasActiveFilters = $derived(searchQuery || selectedMethod || dateFrom || dateTo);
 
   async function deleteTrace(id: string, event: MouseEvent) {
     event.stopPropagation();
@@ -102,14 +150,67 @@
   </header>
 
   <main class="main">
+    <!-- Search and Filters -->
+    <div class="filters-section">
+      <div class="search-row">
+        <input
+          type="text"
+          placeholder="search traces..."
+          value={searchQuery}
+          oninput={handleSearchInput}
+          class="search-input"
+        />
+        <button
+          class="filter-toggle"
+          class:active={showFilters}
+          onclick={() => showFilters = !showFilters}
+        >
+          {showFilters ? '− filters' : '+ filters'}
+        </button>
+      </div>
+
+      {#if showFilters}
+        <div class="filter-panel">
+          <div class="filter-group">
+            <label for="method-filter">method</label>
+            <select id="method-filter" bind:value={selectedMethod} onchange={applyFilters}>
+              <option value="">all methods</option>
+              {#each methods as method}
+                <option value={method.id}>{method.name}</option>
+              {/each}
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <label for="date-from">from</label>
+            <input type="date" id="date-from" bind:value={dateFrom} onchange={applyFilters} />
+          </div>
+
+          <div class="filter-group">
+            <label for="date-to">to</label>
+            <input type="date" id="date-to" bind:value={dateTo} onchange={applyFilters} />
+          </div>
+
+          {#if hasActiveFilters}
+            <button class="clear-filters" onclick={clearFilters}>clear all</button>
+          {/if}
+        </div>
+      {/if}
+    </div>
+
     {#if loading}
       <div class="loading">loading...</div>
     {:else if error}
       <div class="error">{error}</div>
     {:else if traces.length === 0}
       <div class="empty">
-        <p>no traces yet</p>
-        <a href="/">begin</a>
+        {#if hasActiveFilters}
+          <p>no traces match your filters</p>
+          <button onclick={clearFilters}>clear filters</button>
+        {:else}
+          <p>no traces yet</p>
+          <a href="/">begin</a>
+        {/if}
       </div>
     {:else}
       <ul class="trace-list">
@@ -312,5 +413,127 @@
   .page-info {
     font-size: var(--font-size-sm);
     color: var(--muted-color);
+  }
+
+  /* Filters */
+  .filters-section {
+    margin-bottom: 1.5rem;
+  }
+
+  .search-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .search-input {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    padding: 0.5rem 0.75rem;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-color);
+    transition: border-color 150ms;
+  }
+
+  .search-input::placeholder {
+    color: var(--muted-color);
+    opacity: 0.6;
+  }
+
+  .search-input:focus {
+    outline: none;
+    border-color: var(--muted-color);
+  }
+
+  .filter-toggle {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--muted-color);
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 150ms, border-color 150ms;
+  }
+
+  .filter-toggle:hover,
+  .filter-toggle.active {
+    color: var(--text-color);
+    border-color: var(--muted-color);
+  }
+
+  .filter-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
+    margin-top: 0.75rem;
+    padding: 1rem;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+  }
+
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .filter-group label {
+    font-size: var(--font-size-sm);
+    color: var(--muted-color);
+    opacity: 0.7;
+  }
+
+  .filter-group select,
+  .filter-group input[type="date"] {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    padding: 0.4rem 0.5rem;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    color: var(--text-color);
+    min-width: 140px;
+  }
+
+  .filter-group select:focus,
+  .filter-group input[type="date"]:focus {
+    outline: none;
+    border-color: var(--muted-color);
+  }
+
+  .clear-filters {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--muted-color);
+    background: transparent;
+    border: none;
+    padding: 0.4rem 0.5rem;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .clear-filters:hover {
+    color: var(--text-color);
+  }
+
+  .empty button {
+    display: inline-block;
+    margin-top: 1rem;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--accent-color);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
   }
 </style>
