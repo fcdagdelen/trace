@@ -101,22 +101,24 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   const startTime = Date.now();
   const supabaseAdmin = getSupabaseAdmin();
 
-  const { data: traceData, error: traceError } = await supabaseAdmin
+  // Generate UUID client-side to avoid .select() which can trigger schema cache issues
+  const generatedTraceId = crypto.randomUUID();
+
+  const { error: traceError } = await supabaseAdmin
     .from('traces')
     .insert({
+      id: generatedTraceId,
       user_id: userId,
       query,
       method_ids: methodIds,
       started_at: new Date().toISOString(),
-    })
-    .select('id')
-    .single();
+    });
 
   if (traceError) {
     console.error('Failed to create trace:', JSON.stringify(traceError, null, 2));
     persistenceError = traceError.message;
   } else {
-    traceId = traceData.id;
+    traceId = generatedTraceId;
     console.log('[trace] Created trace:', traceId);
   }
 
