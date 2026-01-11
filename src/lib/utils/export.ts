@@ -51,7 +51,18 @@ function textToPdf(text: string): string {
     .replace(/"/g, '"');
 }
 
-export function exportToPdf({ query, lines }: ExportOptions): void {
+export interface ExportResult {
+  success: boolean;
+  error?: string;
+  filename?: string;
+}
+
+export function exportToPdf({ query, lines }: ExportOptions): ExportResult {
+  try {
+    if (!lines || lines.length === 0) {
+      return { success: false, error: 'No content to export' };
+    }
+
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'pt',
@@ -197,6 +208,16 @@ export function exportToPdf({ query, lines }: ExportOptions): void {
     }
   }
 
-  // Save
-  pdf.save(`trace-${Date.now()}.pdf`);
+    // Save
+    const filename = `trace-${Date.now()}.pdf`;
+    pdf.save(filename);
+
+    return { success: true, filename };
+  } catch (error) {
+    console.error('PDF export failed:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate PDF',
+    };
+  }
 }

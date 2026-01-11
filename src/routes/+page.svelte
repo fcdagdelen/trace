@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import InputArea from '$lib/components/InputArea.svelte';
   import TraceView from '$lib/components/TraceView.svelte';
   import InjectionModal from '$lib/components/InjectionModal.svelte';
   import LegendHud from '$lib/components/LegendHud.svelte';
+  import ActiveMethodIndicator from '$lib/components/ActiveMethodIndicator.svelte';
+  import SymbolLegendModal from '$lib/components/SymbolLegendModal.svelte';
   import { traceStore } from '$lib/stores/trace';
   import { sessionStore } from '$lib/stores/session';
   import { getDepthDirection } from '$lib/utils/symbols';
@@ -10,6 +13,14 @@
   import { createSupabaseBrowserClient } from '$lib/services/supabase';
   import { goto } from '$app/navigation';
   import type { Method } from '$lib/methods';
+  import {
+    savePartialTrace,
+    loadPartialTrace,
+    clearPartialTrace,
+    markTraceComplete,
+    getRecoveryAge,
+    type RecoveryData,
+  } from '$lib/utils/recovery';
 
   const supabase = createSupabaseBrowserClient();
 
@@ -20,8 +31,60 @@
 
   // State
   let showInjectionModal = $state(false);
+  let showSymbolLegend = $state(false);
   let userQuery = $state('');
   let currentDepth = $state(0);
+  let exportError = $state<string | null>(null);
+  let recoveryData = $state<RecoveryData | null>(null);
+  let currentMethodIds = $state<string[]>([]);
+
+  // Check for recoverable trace on mount
+  onMount(() => {
+    const saved = loadPartialTrace();
+    if (saved && saved.lines.length > 0) {
+      recoveryData = saved;
+    }
+  });
+
+  // Save partial trace periodically during streaming
+  $effect(() => {
+    if ($traceStore.isStreaming && $traceStore.lines.length > 0) {
+      const sessionId = $sessionStore?.id ?? '';
+      savePartialTrace({
+        query: userQuery,
+        lines: $traceStore.lines,
+        methodIds: currentMethodIds,
+        sessionId,
+        isComplete: false,
+      });
+    }
+  });
+
+  // Recover a saved trace
+  function handleRecover() {
+    if (!recoveryData) return;
+
+    userQuery = recoveryData.query;
+
+    // Create a new session
+    const session = sessionStore.create(recoveryData.query);
+
+    // Restore lines to store (mark as not streaming - just viewing)
+    traceStore.reset();
+    for (const line of recoveryData.lines) {
+      traceStore.addLine(line);
+    }
+
+    // Clear recovery data
+    recoveryData = null;
+    clearPartialTrace();
+  }
+
+  // Dismiss recovery prompt
+  function handleDismissRecovery() {
+    recoveryData = null;
+    clearPartialTrace();
+  }
 
   // Derived state
   const isActive = $derived($traceStore.isStreaming || $traceStore.lines.length > 0);
@@ -55,6 +118,9 @@
         methodIds: string[];
         methods: Method[];
       };
+
+      // Track method IDs for recovery
+      currentMethodIds = methodIds;
 
       // Open SSE connection
       const response = await fetch('/api/trace', {
@@ -94,6 +160,8 @@
 
             if (data.type === 'complete') {
               traceStore.complete();
+              markTraceComplete();
+              clearPartialTrace();
             } else if (data.type === 'error') {
               traceStore.setError(data.message);
             } else if (data.type === 'line' || data.type === 'symbol') {
@@ -165,6 +233,8 @@
     sessionStore.clear();
     userQuery = '';
     currentDepth = 0;
+    currentMethodIds = [];
+    clearPartialTrace();
   }
 
   // Export trace as styled PDF
@@ -172,10 +242,20 @@
     const lines = $traceStore.lines;
     if (lines.length === 0) return;
 
-    exportToPdf({
+    exportError = null;
+
+    const result = exportToPdf({
       query: userQuery,
       lines,
     });
+
+    if (!result.success) {
+      exportError = result.error ?? 'Export failed';
+      // Auto-clear error after 5 seconds
+      setTimeout(() => {
+        exportError = null;
+      }, 5000);
+    }
   }
 </script>
 
@@ -188,6 +268,7 @@
   <header class="header">
     <span class="title">trace</span>
     <div class="header-actions">
+      <button class="header-btn" onclick={() => showSymbolLegend = true} title="Symbol legend">?</button>
       <a href="/history" class="header-btn">history</a>
       {#if isActive}
         <button class="header-btn" onclick={handleExport} disabled={$traceStore.isStreaming}>export</button>
@@ -198,6 +279,23 @@
   </header>
 
   <main class="main">
+    {#if recoveryData && !isActive}
+      <!-- Recovery prompt -->
+      <div class="recovery-banner">
+        <div class="recovery-content">
+          <span class="recovery-icon">◊</span>
+          <div class="recovery-text">
+            <span class="recovery-title">Interrupted trace found</span>
+            <span class="recovery-meta">{recoveryData.lines.length} lines · {getRecoveryAge()}</span>
+          </div>
+        </div>
+        <div class="recovery-actions">
+          <button class="recovery-btn primary" onclick={handleRecover}>restore</button>
+          <button class="recovery-btn" onclick={handleDismissRecovery}>dismiss</button>
+        </div>
+      </div>
+    {/if}
+
     {#if !isActive}
       <!-- Initial input -->
       <div class="input-wrapper">
@@ -217,6 +315,10 @@
     {#if $traceStore.error}
       <div class="error">{$traceStore.error}</div>
     {/if}
+
+    {#if exportError}
+      <div class="export-error">{exportError}</div>
+    {/if}
   </main>
 </div>
 
@@ -228,6 +330,11 @@
 {/if}
 
 <LegendHud />
+<ActiveMethodIndicator />
+
+{#if showSymbolLegend}
+  <SymbolLegendModal onClose={() => showSymbolLegend = false} />
+{/if}
 
 <style>
   .terminal {
@@ -334,5 +441,103 @@
     font-size: var(--font-size-sm, 0.875rem);
     color: #e57373;
     padding-block: 1rem;
+  }
+
+  .export-error {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm, 0.875rem);
+    color: #e57373;
+    background: var(--bg-color, #0d0d0d);
+    border: 1px solid #e57373;
+    padding: 0.75rem 1.5rem;
+    z-index: 100;
+    animation: fadeIn 150ms ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+
+  .recovery-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    margin-block-end: 1.5rem;
+    background: rgba(107, 138, 253, 0.05);
+    border: 1px solid var(--accent-color, #6b8afd);
+    border-radius: 2px;
+  }
+
+  .recovery-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .recovery-icon {
+    font-size: 1.5rem;
+    color: var(--accent-color, #6b8afd);
+    opacity: 0.8;
+  }
+
+  .recovery-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .recovery-title {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm, 0.875rem);
+    color: var(--text-color, #e8e6e3);
+  }
+
+  .recovery-meta {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--muted-color, #666);
+  }
+
+  .recovery-actions {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  .recovery-btn {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm, 0.875rem);
+    color: var(--muted-color, #666);
+    background: transparent;
+    border: 1px solid var(--border-color, #333);
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    transition: all 150ms;
+  }
+
+  .recovery-btn:hover {
+    color: var(--text-color, #e8e6e3);
+    border-color: var(--muted-color, #666);
+  }
+
+  .recovery-btn.primary {
+    color: var(--accent-color, #6b8afd);
+    border-color: var(--accent-color, #6b8afd);
+  }
+
+  .recovery-btn.primary:hover {
+    background: rgba(107, 138, 253, 0.1);
   }
 </style>

@@ -1,12 +1,22 @@
 // Supabase client service
-import { createClient } from '@supabase/supabase-js';
-import { createBrowserClient, createServerClient, isBrowser } from '@supabase/ssr';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createBrowserClient, createServerClient } from '@supabase/ssr';
 import type { Database } from '$lib/types/database';
-import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import { env } from '$env/dynamic/public';
+
+function getEnvVars() {
+  const url = env.PUBLIC_SUPABASE_URL;
+  const anonKey = env.PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) {
+    throw new Error('PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY must be set');
+  }
+  return { url, anonKey };
+}
 
 // Browser client for client-side operations
 export function createSupabaseBrowserClient() {
-  return createBrowserClient<Database>(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY);
+  const { url, anonKey } = getEnvVars();
+  return createBrowserClient<Database>(url, anonKey);
 }
 
 // Server client for server-side operations (use in +server.ts, +page.server.ts)
@@ -17,7 +27,8 @@ export function createSupabaseServerClient(
     remove: (key: string, options: Record<string, unknown>) => void;
   }
 ) {
-  return createServerClient<Database>(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
+  const { url, anonKey } = getEnvVars();
+  return createServerClient<Database>(url, anonKey, {
     cookies: {
       get: (key) => cookies.get(key),
       set: (key, value, options) => {
@@ -30,5 +41,12 @@ export function createSupabaseServerClient(
   });
 }
 
-// Simple client for use in load functions where we don't need cookie management
-export const supabase = createClient<Database>(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY);
+// Simple client factory for use in load functions where we don't need cookie management
+let _supabase: SupabaseClient<Database> | null = null;
+export function getSupabase(): SupabaseClient<Database> {
+  if (!_supabase) {
+    const { url, anonKey } = getEnvVars();
+    _supabase = createClient<Database>(url, anonKey);
+  }
+  return _supabase;
+}
