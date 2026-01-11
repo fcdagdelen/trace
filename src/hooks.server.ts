@@ -1,7 +1,7 @@
 // Server hooks for auth middleware
 import { createServerClient } from '@supabase/ssr';
 import { type Handle, redirect } from '@sveltejs/kit';
-import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import { env } from '$env/dynamic/public';
 import type { Database } from '$lib/types/database';
 import {
   checkRateLimit,
@@ -19,10 +19,17 @@ function getRateLimitType(pathname: string): RateLimitType | null {
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+  const supabaseUrl = env.PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY must be set');
+  }
+
   // Create Supabase client with cookie handling
   event.locals.supabase = createServerClient<Database>(
-    PUBLIC_SUPABASE_URL,
-    PUBLIC_SUPABASE_ANON_KEY,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         get: (key) => event.cookies.get(key),

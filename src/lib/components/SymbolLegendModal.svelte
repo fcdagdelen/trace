@@ -29,8 +29,17 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
+<!-- svelte-ignore a11y_click_events_have_key_events -->
 <div class="modal-backdrop" onclick={onClose} role="presentation">
-  <div class="modal" onclick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="legend-title">
+  <div
+    class="modal"
+    onclick={(e) => e.stopPropagation()}
+    onkeydown={(e) => e.key === 'Escape' && onClose()}
+    role="dialog"
+    aria-labelledby="legend-title"
+    aria-modal="true"
+    tabindex="-1"
+  >
     <header class="modal-header">
       <h2 id="legend-title" class="modal-title">transitional symbols</h2>
       <button class="close-btn" onclick={onClose} aria-label="Close">
