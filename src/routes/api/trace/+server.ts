@@ -9,6 +9,7 @@ import { isTransitionalSymbol } from '$lib/utils/symbols';
 import { calculateDelay, detectClosing, type PacingContext } from '$lib/utils/pacing';
 import type { TraceLineInsert } from '$lib/types/database';
 import { getSupabaseAdmin } from '$lib/services/supabase-admin';
+import { dev } from '$app/environment';
 
 // Session with TTL for cleanup
 interface Session {
@@ -66,10 +67,13 @@ function touchSession(sessionId: string): void {
   }
 }
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   const { query, methodIds, sessionId } = await request.json();
   const session = await locals.getSession();
   const userId = session?.user?.id;
+
+  // Dev mode auth bypass via cookie
+  const DEV_BYPASS_AUTH = dev && cookies.get('dev_bypass_auth') === '1';
 
   if (!query || !methodIds || !sessionId) {
     return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -78,8 +82,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     });
   }
 
-  // Require authentication for trace persistence
-  if (!userId) {
+  // Require authentication for trace persistence (unless dev bypass)
+  if (!userId && !DEV_BYPASS_AUTH) {
     return new Response(JSON.stringify({ error: 'Authentication required' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },
@@ -95,31 +99,36 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   }
 
   // Create trace record in Supabase using admin client (bypasses RLS)
-  // We've already authenticated the user via locals.getSession() above
+  // Skip persistence in dev bypass mode without a real user
   let traceId: string | null = null;
   let persistenceError: string | null = null;
   const startTime = Date.now();
   const supabaseAdmin = getSupabaseAdmin();
 
-  // Generate UUID client-side to avoid .select() which can trigger schema cache issues
-  const generatedTraceId = crypto.randomUUID();
+  if (userId) {
+    // Generate UUID client-side to avoid .select() which can trigger schema cache issues
+    const generatedTraceId = crypto.randomUUID();
 
-  const { error: traceError } = await supabaseAdmin
-    .from('traces')
-    .insert({
-      id: generatedTraceId,
-      user_id: userId,
-      query,
-      method_ids: methodIds,
-      started_at: new Date().toISOString(),
-    });
+    const { error: traceError } = await supabaseAdmin
+      .from('traces')
+      .insert({
+        id: generatedTraceId,
+        user_id: userId,
+        query,
+        method_ids: methodIds,
+        started_at: new Date().toISOString(),
+      });
 
-  if (traceError) {
-    console.error('Failed to create trace:', JSON.stringify(traceError, null, 2));
-    persistenceError = traceError.message;
+    if (traceError) {
+      console.error('Failed to create trace:', JSON.stringify(traceError, null, 2));
+      persistenceError = traceError.message;
+    } else {
+      traceId = generatedTraceId;
+      console.log('[trace] Created trace:', traceId);
+    }
   } else {
-    traceId = generatedTraceId;
-    console.log('[trace] Created trace:', traceId);
+    // Dev bypass mode - no persistence
+    console.log('[trace] Dev bypass mode - skipping persistence');
   }
 
   // Store session with TTL tracking
