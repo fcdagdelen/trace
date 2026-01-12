@@ -2,6 +2,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { type Handle, redirect } from '@sveltejs/kit';
 import { env } from '$env/dynamic/public';
+import { dev } from '$app/environment';
 import type { Database } from '$lib/types/database';
 import {
   checkRateLimit,
@@ -51,6 +52,9 @@ export const handle: Handle = async ({ event, resolve }) => {
     return session;
   };
 
+  // Dev mode auth bypass via cookie (set by /dev route)
+  const DEV_BYPASS_AUTH = dev && event.cookies.get('dev_bypass_auth') === '1';
+
   // Protected page routes - require authentication (redirect to /auth)
   const protectedRoutes = ['/', '/history', '/trace'];
   const isProtectedRoute = protectedRoutes.some(
@@ -59,7 +63,7 @@ export const handle: Handle = async ({ event, resolve }) => {
                event.url.pathname.startsWith('/history/')
   );
 
-  if (isProtectedRoute) {
+  if (isProtectedRoute && !DEV_BYPASS_AUTH) {
     const session = await event.locals.getSession();
     if (!session) {
       throw redirect(303, '/auth');
@@ -73,7 +77,7 @@ export const handle: Handle = async ({ event, resolve }) => {
                event.url.pathname.startsWith(route + '/')
   );
 
-  if (isProtectedApiRoute) {
+  if (isProtectedApiRoute && !DEV_BYPASS_AUTH) {
     const session = await event.locals.getSession();
     if (!session) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
