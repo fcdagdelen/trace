@@ -14,6 +14,7 @@
   let injections = $state<TraceInjection[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
+  let isExporting = $state(false);
 
   // Playback state
   let isReplaying = $state(false);
@@ -110,20 +111,25 @@
     return injections.filter(inj => inj.after_line_sequence === sequence);
   }
 
-  function handleExport() {
-    if (!trace || lines.length === 0) return;
+  async function handleExport() {
+    if (!trace || lines.length === 0 || isExporting) return;
 
-    exportToPdf({
-      query: trace.query,
-      lines: lines.map(l => ({
-        id: l.id,
-        content: l.content,
-        isSymbol: l.is_symbol || false,
-        methodHint: l.method_hint,
-        timestamp: Date.now(),
-        depth: l.depth || 0,
-      })),
-    });
+    isExporting = true;
+    try {
+      await exportToPdf({
+        query: trace.query,
+        lines: lines.map(l => ({
+          id: l.id,
+          content: l.content,
+          isSymbol: l.is_symbol || false,
+          methodHint: l.method_hint,
+          timestamp: Date.now(),
+          depth: l.depth || 0,
+        })),
+      });
+    } finally {
+      isExporting = false;
+    }
   }
 
   function formatDate(dateStr: string | null): string {
@@ -174,7 +180,9 @@
           <span class="progress">{replayIndex}/{lines.length}</span>
         {:else}
           <button class="header-btn" onclick={startReplay}>replay</button>
-          <button class="header-btn" onclick={handleExport}>export</button>
+          <button class="header-btn" onclick={handleExport} disabled={isExporting}>
+            {isExporting ? 'exporting...' : 'export'}
+          </button>
         {/if}
       {/if}
     </div>

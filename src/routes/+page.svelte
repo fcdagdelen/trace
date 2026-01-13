@@ -37,6 +37,7 @@
   let userQuery = $state('');
   let currentDepth = $state(0);
   let exportError = $state<string | null>(null);
+  let isExporting = $state(false);
   let recoveryData = $state<RecoveryData | null>(null);
   let currentMethodIds = $state<string[]>([]);
 
@@ -247,23 +248,28 @@
   }
 
   // Export trace as styled PDF
-  function handleExport() {
+  async function handleExport() {
     const lines = $traceStore.lines;
-    if (lines.length === 0) return;
+    if (lines.length === 0 || isExporting) return;
 
     exportError = null;
+    isExporting = true;
 
-    const result = exportToPdf({
-      query: userQuery,
-      lines,
-    });
+    try {
+      const result = await exportToPdf({
+        query: userQuery,
+        lines,
+      });
 
-    if (!result.success) {
-      exportError = result.error ?? 'Export failed';
-      // Auto-clear error after 5 seconds
-      setTimeout(() => {
-        exportError = null;
-      }, 5000);
+      if (!result.success) {
+        exportError = result.error ?? 'Export failed';
+        // Auto-clear error after 5 seconds
+        setTimeout(() => {
+          exportError = null;
+        }, 5000);
+      }
+    } finally {
+      isExporting = false;
     }
   }
 </script>
@@ -289,7 +295,9 @@
       <button class="header-btn" onclick={() => showSymbolLegend = true} title="Symbol legend">?</button>
       <a href="/history" class="header-btn">history</a>
       {#if isActive}
-        <button class="header-btn" onclick={handleExport} disabled={$traceStore.isStreaming}>export</button>
+        <button class="header-btn" onclick={handleExport} disabled={$traceStore.isStreaming || isExporting}>
+          {isExporting ? 'exporting...' : 'export'}
+        </button>
         <button class="header-btn" onclick={handleReset}>clear</button>
       {/if}
       <button class="header-btn logout" onclick={handleLogout}>exit</button>
