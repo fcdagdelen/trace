@@ -56,11 +56,12 @@ export const handle: Handle = async ({ event, resolve }) => {
   const devBypassAuth = dev && event.cookies.get('dev_bypass_auth') === '1';
 
   // Protected page routes - require authentication (redirect to /auth)
-  const protectedRoutes = ['/', '/history', '/trace'];
+  const protectedRoutes = ['/', '/history', '/trace', '/spirits'];
   const isProtectedRoute = protectedRoutes.some(
     (route) => event.url.pathname === route ||
                event.url.pathname.startsWith('/trace/') ||
-               event.url.pathname.startsWith('/history/')
+               event.url.pathname.startsWith('/history/') ||
+               event.url.pathname.startsWith('/spirits/')
   );
 
   if (isProtectedRoute && !devBypassAuth) {
@@ -71,7 +72,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   // Protected API routes - require authentication (return 401 JSON)
-  const protectedApiRoutes = ['/api/trace', '/api/traces', '/api/analyze'];
+  const protectedApiRoutes = ['/api/trace', '/api/traces', '/api/analyze', '/api/spirits'];
   const isProtectedApiRoute = protectedApiRoutes.some(
     (route) => event.url.pathname === route ||
                event.url.pathname.startsWith(route + '/')
