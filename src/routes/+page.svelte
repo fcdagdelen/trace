@@ -333,6 +333,7 @@
         </span>
       {/if}
       <button class="header-btn" onclick={() => showSymbolLegend = true} title="Symbol legend">?</button>
+      <a href="/spirits/transmute" class="header-btn">transmute</a>
       <a href="/history" class="header-btn">history</a>
       {#if isActive}
         <button class="header-btn" onclick={handleExport} disabled={$traceStore.isStreaming}>export</button>
