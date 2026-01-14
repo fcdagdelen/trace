@@ -15,6 +15,7 @@ import {
 } from '$lib/utils/detection';
 import type { TraceLineInsert } from '$lib/types/database';
 import { getSupabaseAdmin } from '$lib/services/supabase-admin';
+import { dev } from '$app/environment';
 
 // Session with TTL for cleanup
 interface Session {
@@ -72,10 +73,13 @@ function touchSession(sessionId: string): void {
   }
 }
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   const { query, methodIds, sessionId } = await request.json();
   const session = await locals.getSession();
   const userId = session?.user?.id;
+
+  // Dev mode auth bypass via cookie
+  const devBypassAuth = dev && cookies.get('dev_bypass_auth') === '1';
 
   if (!query || !methodIds || !sessionId) {
     return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -84,8 +88,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     });
   }
 
-  // Require authentication for trace persistence
-  if (!userId) {
+  // Require authentication for trace persistence (unless dev bypass)
+  if (!userId && !devBypassAuth) {
     return new Response(JSON.stringify({ error: 'Authentication required' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },
@@ -101,31 +105,38 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   }
 
   // Create trace record in Supabase using admin client (bypasses RLS)
-  // We've already authenticated the user via locals.getSession() above
+  // Skip persistence in dev bypass mode without a real user
   let traceId: string | null = null;
   let persistenceError: string | null = null;
   const startTime = Date.now();
-  const supabaseAdmin = getSupabaseAdmin();
 
-  // Generate UUID client-side to avoid .select() which can trigger schema cache issues
-  const generatedTraceId = crypto.randomUUID();
+  // Only initialize admin client if we have a user (need persistence)
+  const supabaseAdmin = userId ? getSupabaseAdmin() : null;
 
-  const { error: traceError } = await supabaseAdmin
-    .from('traces')
-    .insert({
-      id: generatedTraceId,
-      user_id: userId,
-      query,
-      method_ids: methodIds,
-      started_at: new Date().toISOString(),
-    });
+  if (userId && supabaseAdmin) {
+    // Generate UUID client-side to avoid .select() which can trigger schema cache issues
+    const generatedTraceId = crypto.randomUUID();
 
-  if (traceError) {
-    console.error('Failed to create trace:', JSON.stringify(traceError, null, 2));
-    persistenceError = traceError.message;
+    const { error: traceError } = await supabaseAdmin
+      .from('traces')
+      .insert({
+        id: generatedTraceId,
+        user_id: userId,
+        query,
+        method_ids: methodIds,
+        started_at: new Date().toISOString(),
+      });
+
+    if (traceError) {
+      console.error('Failed to create trace:', JSON.stringify(traceError, null, 2));
+      persistenceError = traceError.message;
+    } else {
+      traceId = generatedTraceId;
+      console.log('[trace] Created trace:', traceId);
+    }
   } else {
-    traceId = generatedTraceId;
-    console.log('[trace] Created trace:', traceId);
+    // Dev bypass mode - no persistence
+    console.log('[trace] Dev bypass mode - skipping persistence');
   }
 
   // Store session with TTL tracking
@@ -260,7 +271,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
               });
 
               // Flush batch if full
-              if (lineBatch.length >= BATCH_SIZE) {
+              if (lineBatch.length >= BATCH_SIZE && supabaseAdmin) {
                 const { error: batchError } = await supabaseAdmin.from('trace_lines').insert(lineBatch);
                 if (batchError) {
                   console.error('Batch insert failed:', batchError);
@@ -302,7 +313,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         }
 
         // Flush remaining lines
-        if (traceId && lineBatch.length > 0) {
+        if (traceId && lineBatch.length > 0 && supabaseAdmin) {
           const { error: finalBatchError } = await supabaseAdmin.from('trace_lines').insert(lineBatch);
           if (finalBatchError) {
             console.error('Final batch insert failed:', finalBatchError);
@@ -311,7 +322,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         }
 
         // Update trace with completion data
-        if (traceId) {
+        if (traceId && supabaseAdmin) {
           const endTime = Date.now();
           const dominantMethod = Object.entries(methodHintCounts)
             .sort((a, b) => b[1] - a[1])[0]?.[0] || null;

@@ -11,6 +11,7 @@
   import { persistenceStore } from '$lib/stores/persistence';
   import { getDepthDirection } from '$lib/utils/symbols';
   import { exportToPdf } from '$lib/utils/export';
+  import { formatLargeInput } from '$lib/utils/truncate';
   import { createSupabaseBrowserClient } from '$lib/services/supabase';
   import { goto } from '$app/navigation';
   import type { Method } from '$lib/methods';
@@ -90,6 +91,7 @@
 
   // Derived state
   const isActive = $derived($traceStore.isStreaming || $traceStore.lines.length > 0);
+  const formattedQuery = $derived(formatLargeInput(userQuery));
 
   // Start a new trace
   function handleSubmit(query: string) {
@@ -323,7 +325,7 @@
       <!-- Show user query as part of trace -->
       <div class="user-input">
         <span class="prompt">›</span>
-        <span class="query">{userQuery}</span>
+        <span class="query" class:truncated={formattedQuery.isTruncated}>{formattedQuery.preview}{#if formattedQuery.indicator}<span class="char-count">{formattedQuery.indicator}</span>{/if}</span>
       </div>
 
       <!-- Trace output -->
@@ -458,6 +460,22 @@
     color: var(--text-color, #e8e6e3);
     line-height: var(--line-height, 1.7);
     white-space: pre-wrap;
+  }
+
+  .user-input .query.truncated {
+    white-space: normal;
+  }
+
+  .user-input .char-count {
+    display: inline-block;
+    margin-left: 0.5em;
+    padding: 0.1em 0.5em;
+    font-size: 0.8em;
+    color: var(--muted-color, #666);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 3px;
+    vertical-align: middle;
   }
 
   .error {
