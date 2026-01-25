@@ -6,8 +6,119 @@ import type { StructuralSignature } from '$lib/spirits/types';
 
 export interface DetectionResult {
   id: string | null;
-  source: 'symbol' | 'structure' | 'rotation' | null;
+  source: 'symbol' | 'structure' | 'rotation' | 'handoff' | null;
   confidence?: number;  // 0-1 for metrics
+}
+
+// Hook line patterns for handoff detection
+// These are phrases that signal intentional transition to another spirit
+export interface HookLinePattern {
+  pattern: RegExp;
+  targetSpirit: string;
+  sourceSpirits: string[];  // Which spirits might use this hook
+}
+
+// Built-in hook line patterns derived from Transmutation Protocols
+// More patterns can be loaded from spirits at runtime
+const HOOK_LINE_PATTERNS: HookLinePattern[] = [
+  // Herzog hooks
+  { pattern: /what remains in the ruins/i, targetSpirit: 'benjamin', sourceSpirits: ['herzog'] },
+  { pattern: /cannot be said, only shown/i, targetSpirit: 'wittgenstein', sourceSpirits: ['herzog'] },
+  { pattern: /the stranger who witnessed/i, targetSpirit: 'simmel', sourceSpirits: ['herzog'] },
+
+  // Benjamin hooks
+  { pattern: /here,? in this landscape/i, targetSpirit: 'herzog', sourceSpirits: ['benjamin'] },
+  { pattern: /the sign that remains/i, targetSpirit: 'barthes', sourceSpirits: ['benjamin'] },
+  { pattern: /the trace undoes itself/i, targetSpirit: 'derrida', sourceSpirits: ['benjamin'] },
+
+  // Wittgenstein hooks
+  { pattern: /what kind of difference is this/i, targetSpirit: 'bateson', sourceSpirits: ['wittgenstein'] },
+  { pattern: /the stranger who plays this game/i, targetSpirit: 'simmel', sourceSpirits: ['wittgenstein'] },
+  { pattern: /here language falls silent/i, targetSpirit: 'herzog', sourceSpirits: ['wittgenstein'] },
+
+  // Simmel hooks
+  { pattern: /what can be said of this form/i, targetSpirit: 'wittgenstein', sourceSpirits: ['simmel'] },
+  { pattern: /the cycle begins again/i, targetSpirit: 'ibn-khaldun', sourceSpirits: ['simmel'] },
+  { pattern: /the apparatus that mediates/i, targetSpirit: 'flusser', sourceSpirits: ['simmel'] },
+
+  // Ibn-Khaldun hooks
+  { pattern: /the pattern that connects these cycles/i, targetSpirit: 'bateson', sourceSpirits: ['ibn-khaldun'] },
+  { pattern: /in this moment,? time collapses/i, targetSpirit: 'benjamin', sourceSpirits: ['ibn-khaldun'] },
+  { pattern: /the stranger who arrives when/i, targetSpirit: 'simmel', sourceSpirits: ['ibn-khaldun'] },
+
+  // Flusser hooks
+  { pattern: /the trace of this gesture/i, targetSpirit: 'derrida', sourceSpirits: ['flusser'] },
+  { pattern: /here the image arrests/i, targetSpirit: 'benjamin', sourceSpirits: ['flusser'] },
+  { pattern: /the connection proliferates/i, targetSpirit: 'deleuze', sourceSpirits: ['flusser'] },
+
+  // Barthes hooks
+  { pattern: /the gesture carries its ancient charge/i, targetSpirit: 'warburg', sourceSpirits: ['barthes'] },
+  { pattern: /here time collapses into image/i, targetSpirit: 'benjamin', sourceSpirits: ['barthes'] },
+  { pattern: /the god enters this scene/i, targetSpirit: 'calasso', sourceSpirits: ['barthes'] },
+
+  // Bateson hooks
+  { pattern: /what can be said of this form/i, targetSpirit: 'wittgenstein', sourceSpirits: ['bateson'] },
+  { pattern: /the pattern gives way to flow/i, targetSpirit: 'deleuze', sourceSpirits: ['bateson'] },
+  { pattern: /the cycle turns again/i, targetSpirit: 'ibn-khaldun', sourceSpirits: ['bateson'] },
+
+  // Warburg hooks
+  { pattern: /in this gesture,? recognition stirs/i, targetSpirit: 'barthes', sourceSpirits: ['warburg'] },
+  { pattern: /here the image flashes/i, targetSpirit: 'benjamin', sourceSpirits: ['warburg'] },
+  { pattern: /the god moves through this form/i, targetSpirit: 'calasso', sourceSpirits: ['warburg'] },
+
+  // Borges hooks
+  { pattern: /the trace marks its own erasure/i, targetSpirit: 'derrida', sourceSpirits: ['borges'] },
+  { pattern: /the god waits at the center/i, targetSpirit: 'calasso', sourceSpirits: ['borges'] },
+  { pattern: /the pattern that connects these mirrors/i, targetSpirit: 'bateson', sourceSpirits: ['borges'] },
+
+  // Calasso hooks
+  { pattern: /this gesture survives in later form/i, targetSpirit: 'warburg', sourceSpirits: ['calasso'] },
+  { pattern: /in this position,? recognition/i, targetSpirit: 'barthes', sourceSpirits: ['calasso'] },
+  { pattern: /the fragment holds what the whole has lost/i, targetSpirit: 'benjamin', sourceSpirits: ['calasso'] },
+
+  // Deleuze hooks
+  { pattern: /what is the pattern that connects/i, targetSpirit: 'bateson', sourceSpirits: ['deleuze'] },
+  { pattern: /the structure that makes this possible/i, targetSpirit: 'grothendieck', sourceSpirits: ['deleuze'] },
+  { pattern: /here,? in this landscape/i, targetSpirit: 'herzog', sourceSpirits: ['deleuze'] },
+
+  // Derrida hooks
+  { pattern: /the library contains its own refutation/i, targetSpirit: 'borges', sourceSpirits: ['derrida'] },
+  { pattern: /the image flashes into legibility/i, targetSpirit: 'benjamin', sourceSpirits: ['derrida'] },
+  { pattern: /the structure that makes this possible/i, targetSpirit: 'grothendieck', sourceSpirits: ['derrida'] },
+
+  // Grothendieck hooks
+  { pattern: /the flow begins to move/i, targetSpirit: 'deleuze', sourceSpirits: ['grothendieck'] },
+  { pattern: /the trace that remains within/i, targetSpirit: 'derrida', sourceSpirits: ['grothendieck'] },
+  { pattern: /what is the pattern that connects/i, targetSpirit: 'bateson', sourceSpirits: ['grothendieck'] },
+];
+
+/**
+ * Detect handoff hook lines in text
+ * Returns the target spirit if a hook line is detected
+ */
+export function detectHandoffHook(
+  line: string,
+  currentSpiritId: string | null,
+  availableSpirits: Set<string>
+): { targetSpirit: string; confidence: number } | null {
+  for (const hook of HOOK_LINE_PATTERNS) {
+    // Check if current spirit can use this hook
+    if (currentSpiritId && !hook.sourceSpirits.includes(currentSpiritId)) {
+      continue;
+    }
+
+    // Check if target spirit is available
+    if (!availableSpirits.has(hook.targetSpirit)) {
+      continue;
+    }
+
+    // Check if pattern matches
+    if (hook.pattern.test(line)) {
+      return { targetSpirit: hook.targetSpirit, confidence: 0.85 };
+    }
+  }
+
+  return null;
 }
 
 export interface DetectionState {
@@ -30,6 +141,7 @@ export interface DetectionMetrics {
   symbolDetections: number;
   structureDetections: number;
   rotationDetections: number;
+  handoffDetections: number;
   depthEscalations: number;
 }
 
@@ -39,6 +151,7 @@ export function createDetectionMetrics(): DetectionMetrics {
     symbolDetections: 0,
     structureDetections: 0,
     rotationDetections: 0,
+    handoffDetections: 0,
     depthEscalations: 0,
   };
 }
@@ -195,15 +308,15 @@ const STRUCTURAL_PATTERNS: StructuralPattern[] = [
 ];
 
 /**
- * Detect which spirit is active based on structure + symbols
- * Priority: symbol resonance > momentum > structural patterns (with hysteresis) > rotation
+ * Detect which spirit is active based on structure + symbols + handoff hooks
+ * Priority: symbol resonance > handoff hooks > momentum > structural patterns (with hysteresis) > rotation
  *
  * Spirits have "momentum" - once detected, they stay active for several lines
  * to allow for more coherent, immersive possession.
  *
  * Hysteresis: Structural pattern detection requires N lines of consistent evidence
  * before switching spirits. This prevents jitter from single-line classifier noise.
- * Symbols bypass hysteresis (they are "hard anchors").
+ * Symbols and handoff hooks bypass hysteresis (they are intentional transitions).
  */
 export function detectActiveSpirit(
   line: string,
@@ -222,7 +335,7 @@ export function detectActiveSpirit(
   // Symbols are "hard anchors" that immediately establish a spirit
   if (state.recentSymbol && SYMBOL_BYPASSES_HYSTERESIS) {
     const resonantMethods = methods.filter(m =>
-      m.resonantSymbols.includes(state.recentSymbol!)
+      m.resonantSymbols?.includes(state.recentSymbol!)
     );
     if (resonantMethods.length > 0) {
       const method = resonantMethods[Math.floor(Math.random() * resonantMethods.length)];
@@ -230,7 +343,15 @@ export function detectActiveSpirit(
     }
   }
 
-  // 2. Spirit momentum - current spirit stays active if it has momentum
+  // 2. Handoff hooks - intentional transitions (bypasses momentum and hysteresis)
+  // Check if current line contains a hook phrase that signals handoff
+  const availableSpirits = new Set(methods.map(m => m.id));
+  const handoff = detectHandoffHook(line, state.currentSpiritId, availableSpirits);
+  if (handoff && availableSpirits.has(handoff.targetSpirit)) {
+    return { id: handoff.targetSpirit, source: 'handoff', confidence: handoff.confidence };
+  }
+
+  // 3. Spirit momentum - current spirit stays active if it has momentum
   if (state.currentSpiritId && state.spiritMomentum > 0) {
     // Attribute source based on how momentum was initiated
     const source = state.momentumInitiatedBySymbol ? 'symbol' : 'structure';
@@ -409,12 +530,26 @@ export function updateDetectionState(
 ): DetectionState {
   const trimmed = line.trim();
   const isSymbol = isTransitionalSymbol(trimmed);
+  const isEmpty = !trimmed;
 
-  // Update recent symbol (cleared if not a symbol line)
-  const recentSymbol = isSymbol ? trimmed : null;
+  // Update recent symbol:
+  // - Set to current symbol if this line is a symbol
+  // - KEEP previous symbol if this line is empty (empty lines are transparent)
+  // - Clear if this is a content line (symbol has been "consumed" for detection)
+  let recentSymbol: string | null;
+  if (isSymbol) {
+    recentSymbol = trimmed;
+  } else if (isEmpty) {
+    // Empty lines are transparent - keep the symbol for the next content line
+    recentSymbol = state.recentSymbol;
+  } else {
+    // Content line - the symbol resonance window has passed
+    recentSymbol = null;
+  }
 
   // Track if THIS line was a symbol (for next iteration's depth escalation)
-  const previousLineWasSymbol = isSymbol;
+  // Empty lines are transparent - preserve the previous state
+  const previousLineWasSymbol = isEmpty ? state.previousLineWasSymbol : isSymbol;
 
   // Update lines since detection
   const linesSinceDetection = result.id ? 0 : state.linesSinceDetection + 1;
@@ -527,6 +662,8 @@ export function updateDetectionMetrics(
     metrics.structureDetections++;
   } else if (result.source === 'rotation') {
     metrics.rotationDetections++;
+  } else if (result.source === 'handoff') {
+    metrics.handoffDetections++;
   }
 
   // Track depth escalations

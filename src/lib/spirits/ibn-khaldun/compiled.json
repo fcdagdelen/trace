@@ -1,0 +1,14 @@
+{
+  "derivedAt": "2026-01-25T12:00:00.000Z",
+  "version": "1.0.0",
+  "color": "#4a3a2d",
+  "letterSpacing": 0.013,
+  "structuralSignature": {
+    "sentenceLength": "medium",
+    "punctuationDensity": "moderate",
+    "rhetoricalMoves": [
+      "return-motif",
+      "past-present-juxtaposition"
+    ]
+  }
+}

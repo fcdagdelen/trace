@@ -1,0 +1,15 @@
+{
+  "derivedAt": "2026-01-25T12:00:00.000Z",
+  "version": "1.0.0",
+  "color": "#2d4a4a",
+  "letterSpacing": 0.019,
+  "structuralSignature": {
+    "sentenceLength": "medium",
+    "punctuationDensity": "dense",
+    "rhetoricalMoves": [
+      "negation",
+      "juxtaposition",
+      "dash-interruption"
+    ]
+  }
+}

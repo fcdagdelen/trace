@@ -1,5 +1,6 @@
 // YAML frontmatter + markdown parser for skill files
 // Parses the skills.md format: YAML frontmatter + markdown body
+import type { HandoffRule, HookLine, TransmutationProtocol } from './types';
 
 export interface SpiritMeta {
   id: string;
@@ -16,6 +17,7 @@ export interface ParsedSpirit {
   kernel: string;           // First paragraph (compressed essence)
   thinkingMode: string[];   // Numbered procedures
   voice: string[];          // Stylistic constraints
+  transmutation?: TransmutationProtocol; // Handoff rules
   fullContent: string;      // Complete markdown body
 }
 
@@ -174,6 +176,73 @@ function extractBulletItems(content: string): string[] {
 }
 
 /**
+ * Extract transmutation protocol from section content
+ */
+function extractTransmutationProtocol(content: string): TransmutationProtocol | undefined {
+  if (!content) return undefined;
+
+  const lines = content.split('\n');
+  const handToWhen: string[] = [];
+  const handFromRules: HandoffRule[] = [];
+  const hookLines: HookLine[] = [];
+
+  let currentSubsection: 'to' | 'from' | 'hooks' | null = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Check for subsection headers
+    if (trimmed.toLowerCase().includes('hand to') && trimmed.includes('when')) {
+      currentSubsection = 'to';
+      continue;
+    }
+    if (trimmed.toLowerCase().includes('hand from') && trimmed.includes('when')) {
+      currentSubsection = 'from';
+      continue;
+    }
+    if (trimmed.toLowerCase().includes('hook line')) {
+      currentSubsection = 'hooks';
+      continue;
+    }
+
+    // Extract bullet items based on current subsection
+    const bulletMatch = trimmed.match(/^[-*]\s+(.+)$/);
+    if (bulletMatch) {
+      const text = bulletMatch[1];
+
+      if (currentSubsection === 'to') {
+        handToWhen.push(text);
+      } else if (currentSubsection === 'from') {
+        // Parse "condition → spiritName" format
+        const arrowMatch = text.match(/(.+?)\s*[→→]\s*(\w+)/);
+        if (arrowMatch) {
+          handFromRules.push({
+            condition: arrowMatch[1].trim(),
+            targetSpirit: arrowMatch[2].toLowerCase(),
+          });
+        }
+      } else if (currentSubsection === 'hooks') {
+        // Parse "\"hook text\" (hooks spiritName)" format
+        const hookMatch = text.match(/[""](.+?)[""].*\(hooks?\s+(\w+)\)/i);
+        if (hookMatch) {
+          hookLines.push({
+            text: hookMatch[1].trim(),
+            targetSpirit: hookMatch[2].toLowerCase(),
+          });
+        }
+      }
+    }
+  }
+
+  // Only return if we found something
+  if (handToWhen.length === 0 && handFromRules.length === 0 && hookLines.length === 0) {
+    return undefined;
+  }
+
+  return { handToWhen, handFromRules, hookLines };
+}
+
+/**
  * Parse a spirit skill file
  */
 export function parseSpirit(content: string): ParsedSpirit {
@@ -201,12 +270,14 @@ export function parseSpirit(content: string): ParsedSpirit {
   const kernel = extractKernel(body);
   const thinkingMode = extractNumberedItems(sections['thinking-mode'] || '');
   const voice = extractBulletItems(sections['voice'] || '');
+  const transmutation = extractTransmutationProtocol(sections['transmutation-protocol'] || '');
 
   return {
     meta: spiritMeta,
     kernel,
     thinkingMode,
     voice,
+    transmutation,
     fullContent: body,
   };
 }

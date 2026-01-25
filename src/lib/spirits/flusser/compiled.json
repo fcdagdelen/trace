@@ -1,0 +1,14 @@
+{
+  "derivedAt": "2026-01-25T12:00:00.000Z",
+  "version": "1.0.0",
+  "color": "#4a4a5a",
+  "letterSpacing": 0.025,
+  "structuralSignature": {
+    "sentenceLength": "short",
+    "punctuationDensity": "sparse",
+    "rhetoricalMoves": [
+      "aphorism",
+      "defamiliarization"
+    ]
+  }
+}

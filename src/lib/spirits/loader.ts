@@ -1,6 +1,6 @@
 // Unified spirit loader - loads from both JSON (legacy) and skills.md (new) formats
 import { parseSpirit, spiritToPromptContent, type ParsedSpirit } from './parser';
-import type { LoadedSpirit, CompiledSpirit, SpiritLoadOptions, DisclosureDepth } from './types';
+import type { LoadedSpirit, CompiledSpirit, SpiritLoadOptions, DisclosureDepth, TransmutationProtocol } from './types';
 import type { Method } from '$lib/methods';
 
 // Cache for loaded spirits
@@ -46,6 +46,22 @@ export async function loadSkillsSpirit(
       }
     }
 
+    // Convert parsed transmutation to the types.ts format
+    let transmutation: TransmutationProtocol | undefined;
+    if (parsed.transmutation) {
+      transmutation = {
+        handToWhen: parsed.transmutation.handToWhen,
+        handFromRules: parsed.transmutation.handFromRules.map(r => ({
+          targetSpirit: r.targetSpirit,
+          condition: r.condition,
+        })),
+        hookLines: parsed.transmutation.hookLines.map(h => ({
+          text: h.text,
+          targetSpirit: h.targetSpirit,
+        })),
+      };
+    }
+
     const loaded: LoadedSpirit = {
       id: parsed.meta.id,
       name: parsed.meta.name,
@@ -66,6 +82,9 @@ export async function loadSkillsSpirit(
       color: compiled?.color || '#4a4a4a',
       letterSpacing: compiled?.letterSpacing || 0.02,
       structuralSignature: compiled?.structuralSignature,
+
+      // Handoff choreography
+      transmutation,
 
       hasDeepContent: !!deepContent,
       deepContent,
@@ -130,7 +149,11 @@ export function loadedSpiritToMethod(spirit: LoadedSpirit): Method {
  * In production, this would scan the spirits directory
  */
 export function getSkillsSpiritIds(): string[] {
-  return ['herzog', 'benjamin', 'wittgenstein'];
+  return [
+    'herzog', 'benjamin', 'wittgenstein', 'simmel', 'ibn-khaldun', 'flusser',
+    'barthes', 'bateson', 'warburg', 'borges', 'calasso',
+    'deleuze', 'derrida', 'grothendieck'
+  ];
 }
 
 /**
