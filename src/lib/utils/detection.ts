@@ -12,12 +12,15 @@ export interface DetectionResult {
 
 export interface DetectionState {
   recentSymbol: string | null;
+  previousLineWasSymbol: boolean;  // Track if last line was a symbol (for depth escalation)
   linesSinceDetection: number;
   lastMethodIndex: number;
   depthLevel: number;  // For progressive disclosure tracking
   // Spirit momentum: keep the current spirit for several lines
   currentSpiritId: string | null;
   spiritMomentum: number;  // Lines remaining for current spirit
+  // Track if current momentum was initiated by symbol (for proper attribution)
+  momentumInitiatedBySymbol: boolean;
 }
 
 export interface DetectionMetrics {
@@ -190,10 +193,13 @@ const STRUCTURAL_PATTERNS: StructuralPattern[] = [
 
 /**
  * Detect which spirit is active based on structure + symbols
- * Priority: momentum > symbol resonance > structural patterns > rotation
+ * Priority: symbol resonance > momentum > structural patterns > rotation
  *
  * Spirits have "momentum" - once detected, they stay active for several lines
  * to allow for more coherent, immersive possession.
+ *
+ * Key fix: Symbol resonance is now checked FIRST, before momentum.
+ * This ensures symbol detections are properly attributed.
  */
 export function detectActiveSpirit(
   line: string,
@@ -207,25 +213,8 @@ export function detectActiveSpirit(
     return { id: null, source: null };
   }
 
-  // 0. Spirit momentum - current spirit stays active if it has momentum
-  // Only strong signals (symbols) can interrupt momentum
-  if (state.currentSpiritId && state.spiritMomentum > 0) {
-    // Check if symbol triggers a DIFFERENT spirit (can interrupt)
-    if (state.recentSymbol) {
-      const resonantMethods = methods.filter(m =>
-        m.resonantSymbols.includes(state.recentSymbol!) && m.id !== state.currentSpiritId
-      );
-      if (resonantMethods.length > 0) {
-        // Symbol interrupts current spirit with a different one
-        const method = resonantMethods[Math.floor(Math.random() * resonantMethods.length)];
-        return { id: method.id, source: 'symbol', confidence: 0.9 };
-      }
-    }
-    // No interruption - continue with current spirit
-    return { id: state.currentSpiritId, source: 'structure', confidence: 0.7 };
-  }
-
-  // 1. Symbol resonance (highest priority for starting new possession)
+  // 1. Symbol resonance (HIGHEST priority - check before momentum)
+  // This is the line AFTER a symbol, when recentSymbol is set
   if (state.recentSymbol) {
     const resonantMethods = methods.filter(m =>
       m.resonantSymbols.includes(state.recentSymbol!)
@@ -236,13 +225,20 @@ export function detectActiveSpirit(
     }
   }
 
-  // 2. Structural pattern detection
+  // 2. Spirit momentum - current spirit stays active if it has momentum
+  if (state.currentSpiritId && state.spiritMomentum > 0) {
+    // Attribute source based on how momentum was initiated
+    const source = state.momentumInitiatedBySymbol ? 'symbol' : 'structure';
+    return { id: state.currentSpiritId, source, confidence: 0.7 };
+  }
+
+  // 3. Structural pattern detection
   const structureMatch = detectByStructure(line, methods);
   if (structureMatch) {
     return { id: structureMatch.id, source: 'structure', confidence: structureMatch.confidence };
   }
 
-  // 3. Round-robin rotation (ensures all spirits speak)
+  // 4. Round-robin rotation (ensures all spirits speak)
   // Increased threshold since spirits now persist longer
   if (state.linesSinceDetection >= 8 && methods.length > 0) {
     const nextIndex = (state.lastMethodIndex + 1) % methods.length;
@@ -353,11 +349,13 @@ const SPIRIT_MOMENTUM_MAX = 8;
 export function createDetectionState(): DetectionState {
   return {
     recentSymbol: null,
+    previousLineWasSymbol: false,
     linesSinceDetection: 0,
     lastMethodIndex: -1,
     depthLevel: 0,
     currentSpiritId: null,
     spiritMomentum: 0,
+    momentumInitiatedBySymbol: false,
   };
 }
 
@@ -376,6 +374,9 @@ export function updateDetectionState(
   // Update recent symbol (cleared if not a symbol line)
   const recentSymbol = isSymbol ? trimmed : null;
 
+  // Track if THIS line was a symbol (for next iteration's depth escalation)
+  const previousLineWasSymbol = isSymbol;
+
   // Update lines since detection
   const linesSinceDetection = result.id ? 0 : state.linesSinceDetection + 1;
 
@@ -386,15 +387,17 @@ export function updateDetectionState(
     if (idx >= 0) lastMethodIndex = idx;
   }
 
-  // Depth escalation: increase when symbol detected (signals deeper possession)
+  // Depth escalation: increase when we get a detection on the line AFTER a symbol
+  // This fixes the bug where isSymbol && result.id were mutually exclusive
   let depthLevel = state.depthLevel;
-  if (isSymbol && result.id && state.depthLevel < 2) {
+  if (state.previousLineWasSymbol && result.id && state.depthLevel < 2) {
     depthLevel = state.depthLevel + 1;
   }
 
   // Spirit momentum management
   let currentSpiritId = state.currentSpiritId;
   let spiritMomentum = state.spiritMomentum;
+  let momentumInitiatedBySymbol = state.momentumInitiatedBySymbol;
 
   if (result.id) {
     if (result.id !== state.currentSpiritId) {
@@ -402,6 +405,8 @@ export function updateDetectionState(
       currentSpiritId = result.id;
       // Random momentum between min and max for variety
       spiritMomentum = SPIRIT_MOMENTUM_MIN + Math.floor(Math.random() * (SPIRIT_MOMENTUM_MAX - SPIRIT_MOMENTUM_MIN + 1));
+      // Track if this new momentum was initiated by a symbol
+      momentumInitiatedBySymbol = result.source === 'symbol';
     } else {
       // Same spirit continues - decrement momentum
       spiritMomentum = Math.max(0, state.spiritMomentum - 1);
@@ -411,16 +416,19 @@ export function updateDetectionState(
     spiritMomentum = Math.max(0, state.spiritMomentum - 1);
     if (spiritMomentum === 0) {
       currentSpiritId = null;
+      momentumInitiatedBySymbol = false;
     }
   }
 
   return {
     recentSymbol,
+    previousLineWasSymbol,
     linesSinceDetection,
     lastMethodIndex,
     depthLevel,
     currentSpiritId,
     spiritMomentum,
+    momentumInitiatedBySymbol,
   };
 }
 
@@ -453,17 +461,19 @@ export function updateDetectionMetrics(
 export function shouldEscalateDepth(
   state: DetectionState,
   result: DetectionResult,
-  line: string
+  _line: string
 ): boolean {
   // Escalate when:
-  // 1. Symbol detected after content (signals transition into deeper possession)
-  // 2. Multiple consecutive detections of same spirit
-  // 3. High confidence structural match
+  // 1. Previous line was a symbol and we got a detection (symbol-initiated possession)
+  // 2. High confidence symbol-source detection
+  // 3. Multiple consecutive detections of same spirit at high confidence
 
-  if (isTransitionalSymbol(line.trim())) {
-    return state.depthLevel < 2;
+  // Symbol-triggered escalation: line after symbol with detection
+  if (state.previousLineWasSymbol && result.id && state.depthLevel < 2) {
+    return true;
   }
 
+  // High confidence symbol detection
   if (result.source === 'symbol' && result.confidence && result.confidence > 0.8) {
     return state.depthLevel < 2;
   }
