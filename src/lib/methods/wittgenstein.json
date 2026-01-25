@@ -6,6 +6,7 @@
   "letterSpacing": 0.020,
   "resonantSymbols": ["∘", "◌", "∴"],
   "vocabulary": ["language-game", "form of life", "grammar", "surveyable", "family resemblance", "beetle in a box", "rule-following", "aspect"],
+  "expandedVocabulary": ["use", "practice", "ordinary", "show", "describe", "dissolve", "therapy", "clear", "see", "game", "word", "meaning", "look", "simple", "arrangement", "confusion", "bewitched", "remind", "essence", "overlap", "similarity"],
   "domains": ["meaning", "use", "language", "practice", "ordinary", "clarity"],
   "compatibleWith": ["bateson", "simmel"],
   "tensionsWith": ["barthes", "deleuze", "derrida"],

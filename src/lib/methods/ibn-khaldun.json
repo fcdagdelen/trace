@@ -6,6 +6,7 @@
   "letterSpacing": 0.013,
   "resonantSymbols": ["◊", "∎", "⊹"],
   "vocabulary": ["asabiyyah", "umran", "mulk", "badawa", "hadara", "cycle", "solidarity", "civilization"],
+  "expandedVocabulary": ["cycle", "rise", "fall", "solidarity", "bond", "weaken", "conquer", "decay", "generation", "luxury", "desert", "urban", "spend", "drain", "dynasty", "civilization", "nomad", "settle", "authority", "cohesion", "tribe"],
   "domains": ["social", "historical", "power", "civilization", "solidarity", "decay"],
   "compatibleWith": ["bateson", "benjamin"],
   "tensionsWith": ["borges", "grothendieck"],

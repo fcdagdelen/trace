@@ -6,6 +6,7 @@
   "letterSpacing": 0.015,
   "resonantSymbols": ["◊", "†", "∴"],
   "vocabulary": ["figure", "scene of language", "matrix-sentence", "topology", "recognition", "position", "amorous subject", "discourse"],
+  "expandedVocabulary": ["position", "posture", "recognize", "inhabit", "stage", "arrange", "crystal", "gesture", "feeling", "wound", "lover", "scene", "image", "capture", "catch", "language", "visible", "invisible", "presence", "absence", "amorous", "tender"],
   "domains": ["affect", "experience", "language", "structure", "love", "recognition"],
   "compatibleWith": ["warburg", "benjamin", "calasso"],
   "tensionsWith": ["deleuze", "wittgenstein"],

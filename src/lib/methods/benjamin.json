@@ -6,6 +6,7 @@
   "letterSpacing": 0.018,
   "resonantSymbols": ["⁂", "∎", "◈"],
   "vocabulary": ["dialectical image", "now-time", "constellation", "ruin", "monad", "aura", "messianic", "tiger's leap"],
+  "expandedVocabulary": ["fragment", "ruin", "flash", "instant", "collapse", "debris", "image", "past", "present", "recognize", "shatter", "crystal", "promise", "arrest", "history", "moment", "particular", "object", "redeem", "blast", "open"],
   "domains": ["history", "fragment", "memory", "modernity", "redemption", "time"],
   "compatibleWith": ["warburg", "barthes", "derrida"],
   "tensionsWith": ["grothendieck", "bateson"],

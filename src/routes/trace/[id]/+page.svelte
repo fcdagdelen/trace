@@ -6,6 +6,7 @@
   import TransitionSymbol from '$lib/components/TransitionSymbol.svelte';
   import LegendHud from '$lib/components/LegendHud.svelte';
   import { exportToPdf } from '$lib/utils/export';
+  import { formatLargeInput } from '$lib/utils/truncate';
   import { getMethod } from '$lib/methods';
   import type { Trace, TraceLine as TraceLineType, TraceInjection } from '$lib/types/database';
 
@@ -30,6 +31,9 @@
     { label: '4x', value: 0.25 },
   ];
   let speedMultiplier = $state(1);
+
+  // Format query for display (truncate if large)
+  const formattedQuery = $derived(formatLargeInput(trace?.query || ''));
 
   // Derive unique methods used in this trace
   const usedMethods = $derived(() => {
@@ -200,7 +204,7 @@
       <div class="trace-header">
         <div class="query">
           <span class="prompt">›</span>
-          <span class="query-text">{trace.query}</span>
+          <span class="query-text" class:truncated={formattedQuery.isTruncated}>{formattedQuery.preview}{#if formattedQuery.indicator}<span class="char-count">{formattedQuery.indicator}</span>{/if}</span>
         </div>
         <div class="meta">
           <span>{formatDate(trace.created_at)}</span>
@@ -351,6 +355,22 @@
     font-size: var(--font-size-base);
     color: var(--text-color);
     line-height: 1.5;
+  }
+
+  .query-text.truncated {
+    white-space: normal;
+  }
+
+  .query-text .char-count {
+    display: inline-block;
+    margin-left: 0.5em;
+    padding: 0.1em 0.5em;
+    font-size: 0.8em;
+    color: var(--muted-color, #666);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 3px;
+    vertical-align: middle;
   }
 
   .meta {

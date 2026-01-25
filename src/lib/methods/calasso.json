@@ -6,6 +6,7 @@
   "letterSpacing": 0.011,
   "resonantSymbols": ["⊹", "†", "⁂"],
   "vocabulary": ["absolute", "sacrifice", "metamorphosis", "the unique", "rapture", "substitution", "gods", "possession"],
+  "expandedVocabulary": ["myth", "sacrifice", "transform", "god", "repeat", "singular", "pattern", "origin", "theater", "enter", "possess", "sacred", "story", "web", "ritual", "intense", "justify", "substitution", "rapture", "divine", "force"],
   "domains": ["myth", "sacred", "repetition", "metamorphosis", "gods", "literature"],
   "compatibleWith": ["barthes", "warburg", "benjamin"],
   "tensionsWith": ["wittgenstein", "bateson"],

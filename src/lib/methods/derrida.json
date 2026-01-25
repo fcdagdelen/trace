@@ -6,6 +6,7 @@
   "letterSpacing": 0.019,
   "resonantSymbols": ["◌", "∴", "†"],
   "vocabulary": ["trace", "différance", "supplement", "arche-writing", "dissemination", "pharmakon", "iterability", "spectre"],
+  "expandedVocabulary": ["trace", "differ", "defer", "slip", "absence", "mark", "residue", "supplement", "blind", "reading", "repeat", "remain", "never", "always", "already", "writing", "speech", "foundation", "effect", "misreading", "ghost"],
   "domains": ["language", "difference", "writing", "absence", "deconstruction", "philosophy"],
   "compatibleWith": ["grothendieck", "borges", "benjamin"],
   "tensionsWith": ["wittgenstein", "ibn-khaldun"],

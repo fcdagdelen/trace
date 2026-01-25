@@ -1,15 +1,30 @@
 // Streaming trace endpoint
 // Generates the thinking trace with selected methods
+// Supports A/B testing between JSON and skills.md spirit formats
 
 import type { RequestHandler } from './$types';
 import { streamMessage } from '$lib/services/claude';
-import { buildSystemPrompt } from '$lib/prompts/system';
+import { buildSystemPrompt, buildHybridSystemPrompt } from '$lib/prompts/system';
 import { getMethods, type Method } from '$lib/methods';
 import { isTransitionalSymbol } from '$lib/utils/symbols';
 import { calculateDelay, detectClosing, type PacingContext } from '$lib/utils/pacing';
+import {
+  detectActiveSpirit,
+  createDetectionState,
+  updateDetectionState,
+  createDetectionMetrics,
+  updateDetectionMetrics,
+  type DetectionState,
+  type DetectionMetrics,
+} from '$lib/utils/detection';
+import { loadSpirits, hasSkillsFormat, loadedSpiritToMethod } from '$lib/spirits/loader';
+import type { LoadedSpirit, DisclosureDepth } from '$lib/spirits/types';
 import type { TraceLineInsert } from '$lib/types/database';
 import { getSupabaseAdmin } from '$lib/services/supabase-admin';
 import { dev } from '$app/environment';
+
+// Spirit format for A/B testing
+type SpiritFormat = 'json' | 'skills' | 'auto';
 
 // Session with TTL for cleanup
 interface Session {
@@ -20,6 +35,7 @@ interface Session {
   traceId: string | null;
   createdAt: number;
   lastActivity: number;
+  spiritFormat: SpiritFormat;
 }
 
 // In-memory session store with TTL-based cleanup
@@ -68,12 +84,23 @@ function touchSession(sessionId: string): void {
 }
 
 export const POST: RequestHandler = async ({ request, locals, cookies }) => {
-  const { query, methodIds, sessionId } = await request.json();
+  const {
+    query,
+    methodIds,
+    sessionId,
+    spiritFormat = 'auto'
+  } = await request.json() as {
+    query: string;
+    methodIds: string[];
+    sessionId: string;
+    spiritFormat?: SpiritFormat;
+  };
+
   const session = await locals.getSession();
   const userId = session?.user?.id;
 
   // Dev mode auth bypass via cookie
-  const DEV_BYPASS_AUTH = dev && cookies.get('dev_bypass_auth') === '1';
+  const devBypassAuth = dev && cookies.get('dev_bypass_auth') === '1';
 
   if (!query || !methodIds || !sessionId) {
     return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -83,19 +110,52 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   }
 
   // Require authentication for trace persistence (unless dev bypass)
-  if (!userId && !DEV_BYPASS_AUTH) {
+  if (!userId && !devBypassAuth) {
     return new Response(JSON.stringify({ error: 'Authentication required' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
-  const methods = getMethods(methodIds);
-  if (methods.length === 0) {
+  // Load methods from legacy JSON format
+  const jsonMethods = getMethods(methodIds);
+  if (jsonMethods.length === 0) {
     return new Response(JSON.stringify({ error: 'No valid methods selected' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  // Determine which spirits should use skills format
+  const skillsSpiritIds = spiritFormat === 'json'
+    ? [] // Force all JSON
+    : methodIds.filter(id => spiritFormat === 'skills' || hasSkillsFormat(id));
+
+  // Load skills-format spirits
+  let skillsSpirits: LoadedSpirit[] = [];
+  if (skillsSpiritIds.length > 0) {
+    skillsSpirits = await loadSpirits(skillsSpiritIds, { format: 'skills', depth: 1 });
+  }
+
+  // Convert skills spirits to Method format for detection compatibility
+  const skillsMethods = skillsSpirits.map(loadedSpiritToMethod);
+
+  // Merge: use skills methods for those we loaded, JSON for the rest
+  const methods: Method[] = jsonMethods.map(m => {
+    const skillsVersion = skillsMethods.find(s => s.id === m.id);
+    return skillsVersion || m;
+  });
+
+  // Build system prompt based on format
+  let systemPrompt: string;
+  const initialDepth: DisclosureDepth = 1;
+
+  if (skillsSpirits.length > 0) {
+    // Hybrid mode: mix of skills and JSON
+    systemPrompt = buildHybridSystemPrompt(jsonMethods, skillsSpirits, initialDepth);
+  } else {
+    // Pure JSON mode
+    systemPrompt = buildSystemPrompt(jsonMethods);
   }
 
   // Create trace record in Supabase using admin client (bypasses RLS)
@@ -103,9 +163,11 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   let traceId: string | null = null;
   let persistenceError: string | null = null;
   const startTime = Date.now();
-  const supabaseAdmin = getSupabaseAdmin();
 
-  if (userId) {
+  // Only initialize admin client if we have a user (need persistence)
+  const supabaseAdmin = userId ? getSupabaseAdmin() : null;
+
+  if (userId && supabaseAdmin) {
     // Generate UUID client-side to avoid .select() which can trigger schema cache issues
     const generatedTraceId = crypto.randomUUID();
 
@@ -124,7 +186,7 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
       persistenceError = traceError.message;
     } else {
       traceId = generatedTraceId;
-      console.log('[trace] Created trace:', traceId);
+      console.log('[trace] Created trace:', traceId, 'format:', spiritFormat);
     }
   } else {
     // Dev bypass mode - no persistence
@@ -141,12 +203,11 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
     traceId,
     createdAt: now,
     lastActivity: now,
+    spiritFormat,
   });
 
   // Ensure cleanup interval is running
   ensureCleanupInterval();
-
-  const systemPrompt = buildSystemPrompt(methods);
 
   // Create SSE stream
   const encoder = new TextEncoder();
@@ -159,6 +220,8 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
           traceId,
           persisted: !!traceId,
           error: persistenceError,
+          spiritFormat,
+          skillsSpirits: skillsSpiritIds,
         };
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(statusEvent)}\n\n`));
 
@@ -175,6 +238,10 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
           isClosing: false,
           methodShifting: false,
         };
+
+        // Multi-signal spirit detection state and metrics
+        let detectionState: DetectionState = createDetectionState();
+        const detectionMetrics: DetectionMetrics = createDetectionMetrics();
 
         const generator = streamMessage({
           system: systemPrompt,
@@ -195,7 +262,11 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 
             // Detect if this is a symbol
             const isSymbol = isTransitionalSymbol(line);
-            if (isSymbol) symbolCount++;
+            if (isSymbol) {
+              symbolCount++;
+              // Set recent symbol for next line's detection
+              detectionState = { ...detectionState, recentSymbol: line.trim() };
+            }
 
             // Update pacing context
             if (isSymbol) {
@@ -209,10 +280,24 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
               pacingContext.isClosing = true;
             }
 
-            // Detect method hints based on vocabulary
-            const methodHint = detectMethodHint(line, methods);
+            // Multi-signal spirit detection
+            const prevState = detectionState;
+            const detectionResult = detectActiveSpirit(line, methods, detectionState);
+            const methodHint = detectionResult.id;
+
+            // Update detection state for next iteration
+            detectionState = updateDetectionState(detectionState, line, detectionResult, methods);
+
+            // Update metrics
+            updateDetectionMetrics(detectionMetrics, detectionResult, detectionState, prevState);
+
+            // Track for dominant method calculation
             if (methodHint) {
               methodHintCounts[methodHint] = (methodHintCounts[methodHint] || 0) + 1;
+              // Flag method shift for pacing
+              pacingContext.methodShifting = true;
+            } else {
+              pacingContext.methodShifting = false;
             }
 
             // Build SSE event
@@ -221,6 +306,9 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
               content: line,
               methodHint,
               lineNumber: lineCount,
+              detectionSource: detectionResult.source,
+              confidence: detectionResult.confidence,
+              depthLevel: detectionState.depthLevel,
             };
 
             // Send the event
@@ -244,10 +332,15 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
                 method_hint: methodHint,
                 depth: currentDepth,
                 relative_time_ms: relativeTime,
+                metadata: {
+                  detectionSource: detectionResult.source,
+                  confidence: detectionResult.confidence,
+                  depthLevel: detectionState.depthLevel,
+                },
               });
 
               // Flush batch if full
-              if (lineBatch.length >= BATCH_SIZE) {
+              if (lineBatch.length >= BATCH_SIZE && supabaseAdmin) {
                 const { error: batchError } = await supabaseAdmin.from('trace_lines').insert(lineBatch);
                 if (batchError) {
                   console.error('Batch insert failed:', batchError);
@@ -289,7 +382,7 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
         }
 
         // Flush remaining lines
-        if (traceId && lineBatch.length > 0) {
+        if (traceId && lineBatch.length > 0 && supabaseAdmin) {
           const { error: finalBatchError } = await supabaseAdmin.from('trace_lines').insert(lineBatch);
           if (finalBatchError) {
             console.error('Final batch insert failed:', finalBatchError);
@@ -298,7 +391,7 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
         }
 
         // Update trace with completion data
-        if (traceId) {
+        if (traceId && supabaseAdmin) {
           const endTime = Date.now();
           const dominantMethod = Object.entries(methodHintCounts)
             .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
@@ -323,13 +416,20 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
         // Clean up completed session
         sessions.delete(sessionId);
 
-        // Send completion event with persistence status
+        // Send completion event with persistence status and metrics
         const completeEvent = {
           type: 'complete',
           traceId,
           persisted: !!traceId && insertErrors.length === 0,
           lineCount,
+          spiritFormat,
           errors: insertErrors.length > 0 ? insertErrors : undefined,
+          metrics: {
+            symbolDetections: detectionMetrics.symbolDetections,
+            structureDetections: detectionMetrics.structureDetections,
+            rotationDetections: detectionMetrics.rotationDetections,
+            depthEscalations: detectionMetrics.depthEscalations,
+          },
         };
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(completeEvent)}\n\n`));
         controller.close();
@@ -352,34 +452,6 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
     },
   });
 };
-
-// Detect which method might be active based on vocabulary
-// Requires 2+ vocabulary matches to reduce false positives, or 1 match for longer/rarer terms
-function detectMethodHint(line: string, methods: Method[]): string | null {
-  const lower = line.toLowerCase();
-
-  let bestMatch: { id: string; score: number } | null = null;
-
-  for (const method of methods) {
-    let score = 0;
-
-    for (const word of method.vocabulary) {
-      const wordLower = word.toLowerCase();
-      if (lower.includes(wordLower)) {
-        // Weight longer words more heavily (more specific)
-        const wordScore = wordLower.length >= 8 ? 2 : 1;
-        score += wordScore;
-      }
-    }
-
-    // Require minimum score of 2 (either 2 short words or 1 long/specific word)
-    if (score >= 2 && (!bestMatch || score > bestMatch.score)) {
-      bestMatch = { id: method.id, score };
-    }
-  }
-
-  return bestMatch?.id ?? null;
-}
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));

@@ -53,17 +53,18 @@ export const handle: Handle = async ({ event, resolve }) => {
   };
 
   // Dev mode auth bypass via cookie (set by /dev route)
-  const DEV_BYPASS_AUTH = dev && event.cookies.get('dev_bypass_auth') === '1';
+  const devBypassAuth = dev && event.cookies.get('dev_bypass_auth') === '1';
 
   // Protected page routes - require authentication (redirect to /auth)
-  const protectedRoutes = ['/', '/history', '/trace'];
+  const protectedRoutes = ['/', '/history', '/trace', '/spirits'];
   const isProtectedRoute = protectedRoutes.some(
     (route) => event.url.pathname === route ||
                event.url.pathname.startsWith('/trace/') ||
-               event.url.pathname.startsWith('/history/')
+               event.url.pathname.startsWith('/history/') ||
+               event.url.pathname.startsWith('/spirits/')
   );
 
-  if (isProtectedRoute && !DEV_BYPASS_AUTH) {
+  if (isProtectedRoute && !devBypassAuth) {
     const session = await event.locals.getSession();
     if (!session) {
       throw redirect(303, '/auth');
@@ -71,13 +72,13 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   // Protected API routes - require authentication (return 401 JSON)
-  const protectedApiRoutes = ['/api/trace', '/api/traces', '/api/analyze'];
+  const protectedApiRoutes = ['/api/trace', '/api/traces', '/api/analyze', '/api/spirits'];
   const isProtectedApiRoute = protectedApiRoutes.some(
     (route) => event.url.pathname === route ||
                event.url.pathname.startsWith(route + '/')
   );
 
-  if (isProtectedApiRoute && !DEV_BYPASS_AUTH) {
+  if (isProtectedApiRoute && !devBypassAuth) {
     const session = await event.locals.getSession();
     if (!session) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {

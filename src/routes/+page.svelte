@@ -6,11 +6,14 @@
   import LegendHud from '$lib/components/LegendHud.svelte';
   import ActiveMethodIndicator from '$lib/components/ActiveMethodIndicator.svelte';
   import SymbolLegendModal from '$lib/components/SymbolLegendModal.svelte';
+  import SpiritSelector from '$lib/components/SpiritSelector.svelte';
+  import { getDefaultSpirits } from '$lib/services/spirits';
   import { traceStore } from '$lib/stores/trace';
   import { sessionStore } from '$lib/stores/session';
   import { persistenceStore } from '$lib/stores/persistence';
   import { getDepthDirection } from '$lib/utils/symbols';
   import { exportToPdf } from '$lib/utils/export';
+  import { formatLargeInput } from '$lib/utils/truncate';
   import { createSupabaseBrowserClient } from '$lib/services/supabase';
   import { goto } from '$app/navigation';
   import type { Method } from '$lib/methods';
@@ -34,12 +37,17 @@
   // State
   let showInjectionModal = $state(false);
   let showSymbolLegend = $state(false);
+  let showSpiritSelector = $state(false);
   let userQuery = $state('');
+  let pendingQuery = $state('');
   let currentDepth = $state(0);
   let exportError = $state<string | null>(null);
   let isExporting = $state(false);
   let recoveryData = $state<RecoveryData | null>(null);
   let currentMethodIds = $state<string[]>([]);
+
+  // Available spirits (defaults for now, will fetch user's custom ones later)
+  const availableSpirits = getDefaultSpirits();
 
   // Check for recoverable trace on mount
   onMount(() => {
@@ -91,36 +99,74 @@
 
   // Derived state
   const isActive = $derived($traceStore.isStreaming || $traceStore.lines.length > 0);
+  const formattedQuery = $derived(formatLargeInput(userQuery));
 
-  // Start a new trace
+  // Handle query submission - show spirit selector
   function handleSubmit(query: string) {
-    userQuery = query;
-
-    // Create session and start trace immediately (UI updates sync)
-    const session = sessionStore.create(query);
-    traceStore.start(session.id, []);
-
-    // Then do async work
-    startTrace(query, session.id);
+    pendingQuery = query;
+    showSpiritSelector = true;
   }
 
-  async function startTrace(query: string, sessionId: string) {
+  // Handle manual spirit selection
+  function handleSpiritSelect(selectedIds: string[]) {
+    showSpiritSelector = false;
+    userQuery = pendingQuery;
+
+    // Create session and start trace
+    const session = sessionStore.create(pendingQuery);
+    traceStore.start(session.id, []);
+
+    // Start trace with pre-selected spirits
+    startTrace(pendingQuery, session.id, selectedIds);
+  }
+
+  // Handle auto-select (let Claude choose)
+  function handleAutoSelect() {
+    showSpiritSelector = false;
+    userQuery = pendingQuery;
+
+    // Create session and start trace
+    const session = sessionStore.create(pendingQuery);
+    traceStore.start(session.id, []);
+
+    // Start trace without pre-selected spirits (Claude will choose)
+    startTrace(pendingQuery, session.id);
+  }
+
+  // Cancel spirit selection
+  function handleCancelSelection() {
+    showSpiritSelector = false;
+    pendingQuery = '';
+  }
+
+  async function startTrace(query: string, sessionId: string, preSelectedIds?: string[]) {
     try {
-      // First, get method selection (kami-gami)
-      const analyzeResponse = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
-      });
+      let methodIds: string[];
+      let methods: Method[];
 
-      if (!analyzeResponse.ok) {
-        throw new Error('Failed to analyze query');
+      if (preSelectedIds && preSelectedIds.length > 0) {
+        // Use pre-selected spirits
+        methodIds = preSelectedIds;
+        methods = availableSpirits.filter(s => preSelectedIds.includes(s.id));
+      } else {
+        // Let Claude select (kami-gami)
+        const analyzeResponse = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query }),
+        });
+
+        if (!analyzeResponse.ok) {
+          throw new Error('Failed to analyze query');
+        }
+
+        const result = await analyzeResponse.json() as {
+          methodIds: string[];
+          methods: Method[];
+        };
+        methodIds = result.methodIds;
+        methods = result.methods;
       }
-
-      const { methodIds, methods } = await analyzeResponse.json() as {
-        methodIds: string[];
-        methods: Method[];
-      };
 
       // Track method IDs for recovery
       currentMethodIds = methodIds;
@@ -293,6 +339,7 @@
         </span>
       {/if}
       <button class="header-btn" onclick={() => showSymbolLegend = true} title="Symbol legend">?</button>
+      <a href="/spirits/transmute" class="header-btn">transmute</a>
       <a href="/history" class="header-btn">history</a>
       {#if isActive}
         <button class="header-btn" onclick={handleExport} disabled={$traceStore.isStreaming || isExporting}>
@@ -322,7 +369,21 @@
       </div>
     {/if}
 
-    {#if !isActive}
+    {#if showSpiritSelector}
+      <!-- Spirit selection -->
+      <div class="selector-wrapper">
+        <div class="pending-query">
+          <span class="prompt">›</span>
+          <span class="query-preview">{pendingQuery}</span>
+        </div>
+        <SpiritSelector
+          spirits={availableSpirits}
+          onSelect={handleSpiritSelect}
+          onAutoSelect={handleAutoSelect}
+        />
+        <button class="back-btn" onclick={handleCancelSelection}>← back</button>
+      </div>
+    {:else if !isActive}
       <!-- Initial input -->
       <div class="input-wrapper">
         <InputArea onSubmit={handleSubmit} disabled={$traceStore.isStreaming} />
@@ -331,7 +392,7 @@
       <!-- Show user query as part of trace -->
       <div class="user-input">
         <span class="prompt">›</span>
-        <span class="query">{userQuery}</span>
+        <span class="query" class:truncated={formattedQuery.isTruncated}>{formattedQuery.preview}{#if formattedQuery.indicator}<span class="char-count">{formattedQuery.indicator}</span>{/if}</span>
       </div>
 
       <!-- Trace output -->
@@ -445,6 +506,52 @@
     padding-top: 2rem;
   }
 
+  .selector-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-top: 1rem;
+  }
+
+  .pending-query {
+    display: flex;
+    gap: 0.75rem;
+    padding-block-end: 1rem;
+    border-block-end: 1px solid var(--border-color, #222);
+  }
+
+  .pending-query .prompt {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-lg, 1.25rem);
+    color: var(--accent-color, #6b8afd);
+    opacity: 0.8;
+  }
+
+  .pending-query .query-preview {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-base, 1.125rem);
+    color: var(--text-color, #e8e6e3);
+    line-height: var(--line-height, 1.7);
+    opacity: 0.8;
+  }
+
+  .back-btn {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm, 0.875rem);
+    color: var(--muted-color, #666);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem 0;
+    text-align: left;
+    transition: color 150ms;
+    align-self: flex-start;
+  }
+
+  .back-btn:hover {
+    color: var(--text-color, #e8e6e3);
+  }
+
   .user-input {
     display: flex;
     gap: 0.75rem;
@@ -466,6 +573,22 @@
     color: var(--text-color, #e8e6e3);
     line-height: var(--line-height, 1.7);
     white-space: pre-wrap;
+  }
+
+  .user-input .query.truncated {
+    white-space: normal;
+  }
+
+  .user-input .char-count {
+    display: inline-block;
+    margin-left: 0.5em;
+    padding: 0.1em 0.5em;
+    font-size: 0.8em;
+    color: var(--muted-color, #666);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 3px;
+    vertical-align: middle;
   }
 
   .error {

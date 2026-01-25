@@ -16,7 +16,9 @@
 		"deploy": "vercel",
 		"deploy:prod": "vercel --prod",
 		"vercel:ls": "vercel ls",
-		"vercel:env": "vercel env pull .env.local"
+		"vercel:env": "vercel env pull .env.local",
+		"spirits:compile": "npx tsx scripts/compile-spirits.ts",
+		"typecheck": "npm run check"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^7.0.0",

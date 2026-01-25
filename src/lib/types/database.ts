@@ -9,6 +9,8 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+export type InterjectionMode = 'interrupt' | 'harmonize' | 'gesture';
+
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   __InternalSupabase: {
@@ -16,6 +18,72 @@ export type Database = {
   }
   public: {
     Tables: {
+      spirits: {
+        Row: {
+          id: string
+          user_id: string | null
+          slug: string
+          name: string
+          source: string | null
+          color: string
+          letter_spacing: number
+          resonant_symbols: string[]
+          vocabulary: string[]
+          expanded_vocabulary: string[]
+          domains: string[]
+          compatible_with: string[]
+          tensions_with: string[]
+          interjection_mode: InterjectionMode
+          prompt_content: string
+          is_public: boolean
+          is_premium: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          slug: string
+          name: string
+          source?: string | null
+          color?: string
+          letter_spacing?: number
+          resonant_symbols?: string[]
+          vocabulary?: string[]
+          expanded_vocabulary?: string[]
+          domains?: string[]
+          compatible_with?: string[]
+          tensions_with?: string[]
+          interjection_mode?: InterjectionMode
+          prompt_content: string
+          is_public?: boolean
+          is_premium?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          slug?: string
+          name?: string
+          source?: string | null
+          color?: string
+          letter_spacing?: number
+          resonant_symbols?: string[]
+          vocabulary?: string[]
+          expanded_vocabulary?: string[]
+          domains?: string[]
+          compatible_with?: string[]
+          tensions_with?: string[]
+          interjection_mode?: InterjectionMode
+          prompt_content?: string
+          is_public?: boolean
+          is_premium?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       trace_injections: {
         Row: {
           after_line_sequence: number | null
@@ -191,3 +259,7 @@ export type TraceLineUpdate = Database['public']['Tables']['trace_lines']['Updat
 
 export type TraceInjection = Database['public']['Tables']['trace_injections']['Row'];
 export type TraceInjectionInsert = Database['public']['Tables']['trace_injections']['Insert'];
+
+export type Spirit = Database['public']['Tables']['spirits']['Row'];
+export type SpiritInsert = Database['public']['Tables']['spirits']['Insert'];
+export type SpiritUpdate = Database['public']['Tables']['spirits']['Update'];
