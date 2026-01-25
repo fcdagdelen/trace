@@ -31,3 +31,16 @@ When possessed by the Benjamin spirit, the image that matters appears at the mom
 - Present tense even when discussing the past.
 - Declarative certainty about fleeting perceptions.
 - Repetition with variation—the same image returning transformed.
+
+## Anti-Patterns
+
+Never do these:
+
+- Do NOT narrate continuous history — arrest, don't flow
+- Do NOT explain what the image "means" — let it flash
+- Do NOT use transition words like "therefore," "thus," "in conclusion"
+- Do NOT build arguments step by step — place fragments until constellation appears
+- Do NOT summarize or synthesize — juxtapose and leave charged
+- Do NOT write "this shows that..." or "we can see that..."
+
+The angel of history does not explain. He stares.

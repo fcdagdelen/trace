@@ -21,6 +21,9 @@ export interface DetectionState {
   spiritMomentum: number;  // Lines remaining for current spirit
   // Track if current momentum was initiated by symbol (for proper attribution)
   momentumInitiatedBySymbol: boolean;
+  // Hysteresis: require N lines of evidence before switching
+  switchCandidate: string | null;  // Spirit we might switch to
+  switchEvidence: number;          // Lines supporting the switch candidate
 }
 
 export interface DetectionMetrics {
@@ -193,13 +196,14 @@ const STRUCTURAL_PATTERNS: StructuralPattern[] = [
 
 /**
  * Detect which spirit is active based on structure + symbols
- * Priority: symbol resonance > momentum > structural patterns > rotation
+ * Priority: symbol resonance > momentum > structural patterns (with hysteresis) > rotation
  *
  * Spirits have "momentum" - once detected, they stay active for several lines
  * to allow for more coherent, immersive possession.
  *
- * Key fix: Symbol resonance is now checked FIRST, before momentum.
- * This ensures symbol detections are properly attributed.
+ * Hysteresis: Structural pattern detection requires N lines of consistent evidence
+ * before switching spirits. This prevents jitter from single-line classifier noise.
+ * Symbols bypass hysteresis (they are "hard anchors").
  */
 export function detectActiveSpirit(
   line: string,
@@ -213,9 +217,10 @@ export function detectActiveSpirit(
     return { id: null, source: null };
   }
 
-  // 1. Symbol resonance (HIGHEST priority - check before momentum)
+  // 1. Symbol resonance (HIGHEST priority - bypasses hysteresis)
   // This is the line AFTER a symbol, when recentSymbol is set
-  if (state.recentSymbol) {
+  // Symbols are "hard anchors" that immediately establish a spirit
+  if (state.recentSymbol && SYMBOL_BYPASSES_HYSTERESIS) {
     const resonantMethods = methods.filter(m =>
       m.resonantSymbols.includes(state.recentSymbol!)
     );
@@ -232,9 +237,34 @@ export function detectActiveSpirit(
     return { id: state.currentSpiritId, source, confidence: 0.7 };
   }
 
-  // 3. Structural pattern detection
+  // 3. Structural pattern detection WITH HYSTERESIS
   const structureMatch = detectByStructure(line, methods);
+
   if (structureMatch) {
+    // If this matches current spirit (or no current spirit), accept immediately
+    if (!state.currentSpiritId || structureMatch.id === state.currentSpiritId) {
+      return { id: structureMatch.id, source: 'structure', confidence: structureMatch.confidence };
+    }
+
+    // Different spirit detected - apply hysteresis
+    // Check if this is the same candidate we've been accumulating evidence for
+    if (structureMatch.id === state.switchCandidate) {
+      // Same candidate - check if we've accumulated enough evidence
+      // Note: evidence is incremented in updateDetectionState
+      if (state.switchEvidence >= SWITCH_THRESHOLD - 1) {
+        // Threshold reached - allow the switch
+        return { id: structureMatch.id, source: 'structure', confidence: structureMatch.confidence };
+      }
+    }
+
+    // Not enough evidence yet - return current spirit or the candidate as tentative
+    // We return the structure match but let updateDetectionState handle hysteresis tracking
+    // For now, stick with current spirit if we have one
+    if (state.currentSpiritId) {
+      return { id: state.currentSpiritId, source: 'structure', confidence: 0.5 };
+    }
+
+    // No current spirit - accept the new one
     return { id: structureMatch.id, source: 'structure', confidence: structureMatch.confidence };
   }
 
@@ -343,6 +373,13 @@ export function detectBySignature(
 const SPIRIT_MOMENTUM_MIN = 4;
 const SPIRIT_MOMENTUM_MAX = 8;
 
+// Hysteresis: require N lines of evidence before switching spirits
+// This prevents jitter from single-line classifier noise
+const SWITCH_THRESHOLD = 2;
+
+// Symbols are "hard anchors" - they bypass hysteresis and switch immediately
+const SYMBOL_BYPASSES_HYSTERESIS = true;
+
 /**
  * Create initial detection state
  */
@@ -356,6 +393,8 @@ export function createDetectionState(): DetectionState {
     currentSpiritId: null,
     spiritMomentum: 0,
     momentumInitiatedBySymbol: false,
+    switchCandidate: null,
+    switchEvidence: 0,
   };
 }
 
@@ -399,6 +438,10 @@ export function updateDetectionState(
   let spiritMomentum = state.spiritMomentum;
   let momentumInitiatedBySymbol = state.momentumInitiatedBySymbol;
 
+  // Hysteresis tracking for switch candidates
+  let switchCandidate = state.switchCandidate;
+  let switchEvidence = state.switchEvidence;
+
   if (result.id) {
     if (result.id !== state.currentSpiritId) {
       // New spirit detected - reset momentum
@@ -407,6 +450,9 @@ export function updateDetectionState(
       spiritMomentum = SPIRIT_MOMENTUM_MIN + Math.floor(Math.random() * (SPIRIT_MOMENTUM_MAX - SPIRIT_MOMENTUM_MIN + 1));
       // Track if this new momentum was initiated by a symbol
       momentumInitiatedBySymbol = result.source === 'symbol';
+      // Clear hysteresis state on successful switch
+      switchCandidate = null;
+      switchEvidence = 0;
     } else {
       // Same spirit continues - decrement momentum
       spiritMomentum = Math.max(0, state.spiritMomentum - 1);
@@ -420,6 +466,27 @@ export function updateDetectionState(
     }
   }
 
+  // Update hysteresis: track evidence for potential switch candidates
+  // This runs separately from the main detection to accumulate evidence
+  const structureMatch = detectByStructureForHysteresis(line, methods);
+  if (structureMatch && currentSpiritId && structureMatch.id !== currentSpiritId) {
+    // Structure suggests a different spirit than current
+    if (structureMatch.id === switchCandidate) {
+      // Same candidate - accumulate evidence
+      switchEvidence = switchEvidence + 1;
+    } else {
+      // New candidate - reset evidence
+      switchCandidate = structureMatch.id;
+      switchEvidence = 1;
+    }
+  } else if (!structureMatch || structureMatch.id === currentSpiritId) {
+    // No different candidate detected - decay evidence
+    switchEvidence = Math.max(0, switchEvidence - 1);
+    if (switchEvidence === 0) {
+      switchCandidate = null;
+    }
+  }
+
   return {
     recentSymbol,
     previousLineWasSymbol,
@@ -429,7 +496,20 @@ export function updateDetectionState(
     currentSpiritId,
     spiritMomentum,
     momentumInitiatedBySymbol,
+    switchCandidate,
+    switchEvidence,
   };
+}
+
+/**
+ * Lightweight structure detection for hysteresis tracking
+ * Same logic as detectByStructure but exported for use in updateDetectionState
+ */
+function detectByStructureForHysteresis(
+  line: string,
+  methods: Method[]
+): { id: string; confidence: number } | null {
+  return detectByStructure(line, methods);
 }
 
 /**
