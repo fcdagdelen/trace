@@ -35,8 +35,8 @@
   // Available methods (subset for testing)
   const availableMethods = [
     { id: 'herzog', name: 'Herzog', hasSkills: true },
-    { id: 'benjamin', name: 'Benjamin', hasSkills: false },
-    { id: 'wittgenstein', name: 'Wittgenstein', hasSkills: false },
+    { id: 'benjamin', name: 'Benjamin', hasSkills: true },
+    { id: 'wittgenstein', name: 'Wittgenstein', hasSkills: true },
     { id: 'barthes', name: 'Barthes', hasSkills: false },
     { id: 'deleuze', name: 'Deleuze', hasSkills: false },
     { id: 'bateson', name: 'Bateson', hasSkills: false },

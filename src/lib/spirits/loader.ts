@@ -130,8 +130,7 @@ export function loadedSpiritToMethod(spirit: LoadedSpirit): Method {
  * In production, this would scan the spirits directory
  */
 export function getSkillsSpiritIds(): string[] {
-  // Currently just herzog as pilot
-  return ['herzog'];
+  return ['herzog', 'benjamin', 'wittgenstein'];
 }
 
 /**

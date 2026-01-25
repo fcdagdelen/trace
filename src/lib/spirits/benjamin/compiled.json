@@ -1,8 +1,8 @@
 {
-  "derivedAt": "2026-01-25T11:30:10.618Z",
-  "version": "1.0.0-e0d141cc",
-  "color": "#4a5568",
-  "letterSpacing": 0.02,
+  "derivedAt": "2026-01-25T11:30:10.617Z",
+  "version": "1.0.0-16274adc",
+  "color": "#2d3748",
+  "letterSpacing": 0.015,
   "structuralSignature": {
     "sentenceLength": "short",
     "punctuationDensity": "sparse",
