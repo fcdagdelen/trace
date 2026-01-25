@@ -1,9 +1,10 @@
 // Streaming trace endpoint
 // Generates the thinking trace with selected methods
+// Supports A/B testing between JSON and skills.md spirit formats
 
 import type { RequestHandler } from './$types';
 import { streamMessage } from '$lib/services/claude';
-import { buildSystemPrompt } from '$lib/prompts/system';
+import { buildSystemPrompt, buildHybridSystemPrompt } from '$lib/prompts/system';
 import { getMethods, type Method } from '$lib/methods';
 import { isTransitionalSymbol } from '$lib/utils/symbols';
 import { calculateDelay, detectClosing, type PacingContext } from '$lib/utils/pacing';
@@ -11,11 +12,19 @@ import {
   detectActiveSpirit,
   createDetectionState,
   updateDetectionState,
+  createDetectionMetrics,
+  updateDetectionMetrics,
   type DetectionState,
+  type DetectionMetrics,
 } from '$lib/utils/detection';
+import { loadSpirits, hasSkillsFormat, loadedSpiritToMethod } from '$lib/spirits/loader';
+import type { LoadedSpirit, DisclosureDepth } from '$lib/spirits/types';
 import type { TraceLineInsert } from '$lib/types/database';
 import { getSupabaseAdmin } from '$lib/services/supabase-admin';
 import { dev } from '$app/environment';
+
+// Spirit format for A/B testing
+type SpiritFormat = 'json' | 'skills' | 'auto';
 
 // Session with TTL for cleanup
 interface Session {
@@ -26,6 +35,7 @@ interface Session {
   traceId: string | null;
   createdAt: number;
   lastActivity: number;
+  spiritFormat: SpiritFormat;
 }
 
 // In-memory session store with TTL-based cleanup
@@ -74,7 +84,18 @@ function touchSession(sessionId: string): void {
 }
 
 export const POST: RequestHandler = async ({ request, locals, cookies }) => {
-  const { query, methodIds, sessionId } = await request.json();
+  const {
+    query,
+    methodIds,
+    sessionId,
+    spiritFormat = 'auto'
+  } = await request.json() as {
+    query: string;
+    methodIds: string[];
+    sessionId: string;
+    spiritFormat?: SpiritFormat;
+  };
+
   const session = await locals.getSession();
   const userId = session?.user?.id;
 
@@ -96,12 +117,45 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
     });
   }
 
-  const methods = getMethods(methodIds);
-  if (methods.length === 0) {
+  // Load methods from legacy JSON format
+  const jsonMethods = getMethods(methodIds);
+  if (jsonMethods.length === 0) {
     return new Response(JSON.stringify({ error: 'No valid methods selected' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  // Determine which spirits should use skills format
+  const skillsSpiritIds = spiritFormat === 'json'
+    ? [] // Force all JSON
+    : methodIds.filter(id => spiritFormat === 'skills' || hasSkillsFormat(id));
+
+  // Load skills-format spirits
+  let skillsSpirits: LoadedSpirit[] = [];
+  if (skillsSpiritIds.length > 0) {
+    skillsSpirits = await loadSpirits(skillsSpiritIds, { format: 'skills', depth: 1 });
+  }
+
+  // Convert skills spirits to Method format for detection compatibility
+  const skillsMethods = skillsSpirits.map(loadedSpiritToMethod);
+
+  // Merge: use skills methods for those we loaded, JSON for the rest
+  const methods: Method[] = jsonMethods.map(m => {
+    const skillsVersion = skillsMethods.find(s => s.id === m.id);
+    return skillsVersion || m;
+  });
+
+  // Build system prompt based on format
+  let systemPrompt: string;
+  const initialDepth: DisclosureDepth = 1;
+
+  if (skillsSpirits.length > 0) {
+    // Hybrid mode: mix of skills and JSON
+    systemPrompt = buildHybridSystemPrompt(jsonMethods, skillsSpirits, initialDepth);
+  } else {
+    // Pure JSON mode
+    systemPrompt = buildSystemPrompt(jsonMethods);
   }
 
   // Create trace record in Supabase using admin client (bypasses RLS)
@@ -132,7 +186,7 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
       persistenceError = traceError.message;
     } else {
       traceId = generatedTraceId;
-      console.log('[trace] Created trace:', traceId);
+      console.log('[trace] Created trace:', traceId, 'format:', spiritFormat);
     }
   } else {
     // Dev bypass mode - no persistence
@@ -149,12 +203,11 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
     traceId,
     createdAt: now,
     lastActivity: now,
+    spiritFormat,
   });
 
   // Ensure cleanup interval is running
   ensureCleanupInterval();
-
-  const systemPrompt = buildSystemPrompt(methods);
 
   // Create SSE stream
   const encoder = new TextEncoder();
@@ -167,6 +220,8 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
           traceId,
           persisted: !!traceId,
           error: persistenceError,
+          spiritFormat,
+          skillsSpirits: skillsSpiritIds,
         };
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(statusEvent)}\n\n`));
 
@@ -183,8 +238,10 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
           isClosing: false,
           methodShifting: false,
         };
-        // Multi-signal spirit detection state
+
+        // Multi-signal spirit detection state and metrics
         let detectionState: DetectionState = createDetectionState();
+        const detectionMetrics: DetectionMetrics = createDetectionMetrics();
 
         const generator = streamMessage({
           system: systemPrompt,
@@ -224,11 +281,15 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
             }
 
             // Multi-signal spirit detection
+            const prevState = detectionState;
             const detectionResult = detectActiveSpirit(line, methods, detectionState);
             const methodHint = detectionResult.id;
 
             // Update detection state for next iteration
             detectionState = updateDetectionState(detectionState, line, detectionResult, methods);
+
+            // Update metrics
+            updateDetectionMetrics(detectionMetrics, detectionResult, detectionState, prevState);
 
             // Track for dominant method calculation
             if (methodHint) {
@@ -245,6 +306,9 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
               content: line,
               methodHint,
               lineNumber: lineCount,
+              detectionSource: detectionResult.source,
+              confidence: detectionResult.confidence,
+              depthLevel: detectionState.depthLevel,
             };
 
             // Send the event
@@ -268,6 +332,11 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
                 method_hint: methodHint,
                 depth: currentDepth,
                 relative_time_ms: relativeTime,
+                metadata: {
+                  detectionSource: detectionResult.source,
+                  confidence: detectionResult.confidence,
+                  depthLevel: detectionState.depthLevel,
+                },
               });
 
               // Flush batch if full
@@ -347,13 +416,20 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
         // Clean up completed session
         sessions.delete(sessionId);
 
-        // Send completion event with persistence status
+        // Send completion event with persistence status and metrics
         const completeEvent = {
           type: 'complete',
           traceId,
           persisted: !!traceId && insertErrors.length === 0,
           lineCount,
+          spiritFormat,
           errors: insertErrors.length > 0 ? insertErrors : undefined,
+          metrics: {
+            symbolDetections: detectionMetrics.symbolDetections,
+            structureDetections: detectionMetrics.structureDetections,
+            rotationDetections: detectionMetrics.rotationDetections,
+            depthEscalations: detectionMetrics.depthEscalations,
+          },
         };
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(completeEvent)}\n\n`));
         controller.close();

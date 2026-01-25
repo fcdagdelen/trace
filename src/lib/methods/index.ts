@@ -28,6 +28,8 @@ import grothendieck from './grothendieck.json';
 import calasso from './calasso.json';
 import borges from './borges.json';
 import derrida from './derrida.json';
+import herzog from './herzog.json';
+import flusser from './flusser.json';
 
 // The method cloud
 export const methods: Method[] = [
@@ -43,6 +45,8 @@ export const methods: Method[] = [
   calasso,
   borges,
   derrida,
+  herzog,
+  flusser,
 ] as Method[];
 
 // Get method by ID

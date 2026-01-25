@@ -1,264 +1,322 @@
-// Spirit detection utilities - multi-signal approach for abundant presence
+// Spirit detection utilities - structure + symbols approach
+// No vocabulary detection per "no technical tells" rule
 import type { Method } from '$lib/methods';
 import { isTransitionalSymbol } from './symbols';
+import type { StructuralSignature } from '$lib/spirits/types';
 
 export interface DetectionResult {
   id: string | null;
-  source: 'symbol' | 'vocabulary' | 'pattern' | 'rotation' | null;
+  source: 'symbol' | 'structure' | 'rotation' | null;
+  confidence?: number;  // 0-1 for metrics
 }
 
 export interface DetectionState {
   recentSymbol: string | null;
   linesSinceDetection: number;
   lastMethodIndex: number;
+  depthLevel: number;  // For progressive disclosure tracking
 }
 
-// Expanded vocabulary for each spirit - natural words Claude uses when possessed
-// These are NOT technical jargon, but semantic field words
-export const EXPANDED_VOCABULARY: Record<string, string[]> = {
-  barthes: [
-    'position', 'posture', 'recognize', 'inhabit', 'stage', 'arrange', 'crystal',
-    'gesture', 'feeling', 'wound', 'lover', 'scene', 'image', 'capture', 'catch',
-    'language', 'visible', 'invisible', 'presence', 'absence', 'amorous', 'tender'
-  ],
-  warburg: [
-    'survive', 'migrate', 'charge', 'emotion', 'gesture', 'persist', 'echo',
-    'ancient', 'modern', 'image', 'atlas', 'body', 'inherited', 'form', 'charged',
-    'travel', 'century', 'relief', 'painting', 'expression', 'memory', 'collective'
-  ],
-  benjamin: [
-    'fragment', 'ruin', 'flash', 'instant', 'collapse', 'debris', 'image',
-    'past', 'present', 'recognize', 'shatter', 'crystal', 'promise', 'arrest',
-    'history', 'moment', 'particular', 'object', 'redeem', 'blast', 'open'
-  ],
-  deleuze: [
-    'connect', 'flow', 'escape', 'transform', 'multiply', 'middle', 'vector',
-    'territory', 'desire', 'machine', 'line', 'network', 'intensity', 'map',
-    'copy', 'heterogeneous', 'function', 'charge', 'pressure', 'becoming'
-  ],
-  wittgenstein: [
-    'use', 'practice', 'ordinary', 'show', 'describe', 'dissolve', 'therapy',
-    'clear', 'see', 'game', 'word', 'meaning', 'look', 'simple', 'arrangement',
-    'confusion', 'bewitched', 'remind', 'essence', 'overlap', 'similarity'
-  ],
-  bateson: [
-    'pattern', 'context', 'relationship', 'level', 'frame', 'message', 'learn',
-    'circuit', 'feedback', 'system', 'both', 'trap', 'bind', 'punish', 'perceive',
-    'contradict', 'spiral', 'runaway', 'relationship', 'connect', 'crab', 'lobster'
-  ],
-  simmel: [
-    'stranger', 'near', 'far', 'distance', 'form', 'relation', 'interact',
-    'position', 'objective', 'geometry', 'social', 'secret', 'bridge', 'door',
-    'miser', 'adventure', 'crystallize', 'alien', 'tragedy', 'culture'
-  ],
-  'ibn-khaldun': [
-    'cycle', 'rise', 'fall', 'solidarity', 'bond', 'weaken', 'conquer', 'decay',
-    'generation', 'luxury', 'desert', 'urban', 'spend', 'drain', 'dynasty',
-    'civilization', 'nomad', 'settle', 'authority', 'cohesion', 'tribe'
-  ],
-  grothendieck: [
-    'expand', 'dissolve', 'context', 'natural', 'structure', 'transform',
-    'perspective', 'patience', 'sea', 'rise', 'setting', 'abstract', 'nut',
-    'soften', 'visible', 'essential', 'geometry', 'space', 'recover', 'level'
-  ],
-  calasso: [
-    'myth', 'sacrifice', 'transform', 'god', 'repeat', 'singular', 'pattern',
-    'origin', 'theater', 'enter', 'possess', 'sacred', 'story', 'web', 'ritual',
-    'intense', 'justify', 'substitution', 'rapture', 'divine', 'force'
-  ],
-  borges: [
-    'mirror', 'infinite', 'branch', 'fork', 'center', 'contain', 'dream',
-    'tiger', 'library', 'labyrinth', 'version', 'parallel', 'regress', 'vertiginous',
-    'universe', 'encyclopedia', 'territory', 'map', 'forget', 'haunt'
-  ],
-  derrida: [
-    'trace', 'differ', 'defer', 'slip', 'absence', 'mark', 'residue',
-    'supplement', 'blind', 'reading', 'repeat', 'remain', 'never', 'always',
-    'already', 'writing', 'speech', 'foundation', 'effect', 'misreading', 'ghost'
-  ],
-};
+export interface DetectionMetrics {
+  symbolDetections: number;
+  structureDetections: number;
+  rotationDetections: number;
+  depthEscalations: number;
+}
 
-// Structural patterns that indicate specific spirits
-interface PatternRule {
+// Create fresh metrics
+export function createDetectionMetrics(): DetectionMetrics {
+  return {
+    symbolDetections: 0,
+    structureDetections: 0,
+    rotationDetections: 0,
+    depthEscalations: 0,
+  };
+}
+
+// Structural patterns mapped to spirits
+// These are syntax/rhythm patterns, NOT vocabulary
+interface StructuralPattern {
   test: (line: string) => boolean;
   spirits: string[];
   weight: number;
+  description: string;  // For debugging
 }
 
-const STRUCTURAL_PATTERNS: PatternRule[] = [
-  // Very short declarative sentences → Wittgenstein
+const STRUCTURAL_PATTERNS: StructuralPattern[] = [
+  // Sentence length patterns
   {
     test: (line) => {
       const words = line.trim().split(/\s+/);
-      return words.length <= 6 && line.endsWith('.') && !line.includes('?');
+      return words.length <= 7 && line.endsWith('.') && !line.includes('?');
     },
-    spirits: ['wittgenstein'],
-    weight: 1,
-  },
-  // Questions → Bateson (metacommunication, inquiry)
-  {
-    test: (line) => line.includes('?'),
-    spirits: ['bateson', 'wittgenstein'],
-    weight: 1,
-  },
-  // "not X but Y" construction → Derrida, Benjamin
-  {
-    test: (line) => /not\s+\w+\s+but\s+/i.test(line),
-    spirits: ['derrida', 'benjamin'],
+    spirits: ['wittgenstein', 'herzog'],
     weight: 2,
+    description: 'short-declarative',
   },
-  // Long flowing sentences (>35 words) → Deleuze, Grothendieck
   {
     test: (line) => line.trim().split(/\s+/).length > 35,
-    spirits: ['deleuze', 'grothendieck'],
-    weight: 1,
+    spirits: ['deleuze', 'grothendieck', 'calasso'],
+    weight: 2,
+    description: 'long-flowing',
   },
-  // Parallel structures (commas with similar phrases) → Benjamin, Warburg
+
+  // Punctuation patterns
   {
     test: (line) => {
       const commaCount = (line.match(/,/g) || []).length;
-      return commaCount >= 3;
+      const wordCount = line.trim().split(/\s+/).length;
+      return commaCount >= 4 && wordCount > 15;
     },
-    spirits: ['benjamin', 'warburg'],
-    weight: 1,
+    spirits: ['benjamin', 'warburg', 'calasso'],
+    weight: 2,
+    description: 'high-comma-density',
   },
-  // References to time/memory/past → Benjamin, Warburg
   {
-    test: (line) => /\b(memory|remember|past|history|time|moment|instant)\b/i.test(line),
-    spirits: ['benjamin', 'warburg'],
+    test: (line) => /[—–]/.test(line),  // em-dash or en-dash
+    spirits: ['derrida', 'benjamin', 'barthes'],
     weight: 1,
+    description: 'dash-interruption',
   },
-  // References to cycles/return → Ibn Khaldun, Bateson
   {
-    test: (line) => /\b(cycle|return|repeat|again|spiral|generation)\b/i.test(line),
-    spirits: ['ibn-khaldun', 'bateson'],
+    test: (line) => (line.match(/;/g) || []).length >= 1,
+    spirits: ['grothendieck', 'derrida'],
     weight: 1,
+    description: 'semicolon-usage',
   },
-  // References to infinity/recursion → Borges
+
+  // Syntactic structures
   {
-    test: (line) => /\b(infinite|endless|forever|recursive|contain|within)\b/i.test(line),
-    spirits: ['borges', 'grothendieck'],
-    weight: 1,
+    test: (line) => /not\s+\w+[\w\s,]*\s+but\s+/i.test(line),
+    spirits: ['derrida', 'benjamin'],
+    weight: 3,
+    description: 'not-X-but-Y',
   },
-  // References to social forms/relations → Simmel
   {
-    test: (line) => /\b(stranger|distance|near|far|relation|form|social)\b/i.test(line),
-    spirits: ['simmel'],
+    test: (line) => /neither\s+[\w\s]+\s+nor\s+/i.test(line),
+    spirits: ['derrida', 'bateson'],
+    weight: 2,
+    description: 'neither-nor',
+  },
+  {
+    test: (line) => line.includes('?'),
+    spirits: ['bateson', 'wittgenstein', 'barthes'],
     weight: 1,
+    description: 'interrogative',
+  },
+  {
+    test: (line) => /\b(if\s+[\w\s]+,\s+then)\b/i.test(line),
+    spirits: ['bateson', 'grothendieck'],
+    weight: 2,
+    description: 'conditional',
+  },
+
+  // Rhetorical patterns
+  {
+    test: (line) => {
+      // Parallel structure: similar clause beginnings
+      const parts = line.split(/[,;]/);
+      if (parts.length < 3) return false;
+      const firstWords = parts.map(p => p.trim().split(/\s+/)[0]?.toLowerCase());
+      const repeated = firstWords.filter((w, i, arr) => arr.indexOf(w) !== i);
+      return repeated.length >= 1;
+    },
+    spirits: ['benjamin', 'warburg', 'borges'],
+    weight: 2,
+    description: 'parallel-structure',
+  },
+  {
+    test: (line) => /\b(again|once more|return|back to)\b/i.test(line),
+    spirits: ['ibn-khaldun', 'bateson', 'derrida'],
+    weight: 1,
+    description: 'return-motif',
+  },
+
+  // Perspective patterns
+  {
+    test: (line) => /\b(one\s+might|perhaps|it\s+seems)\b/i.test(line),
+    spirits: ['simmel', 'barthes'],
+    weight: 1,
+    description: 'hedged-observation',
+  },
+  {
+    test: (line) => /\b(every|all|each|always|never)\b/i.test(line) && line.trim().split(/\s+/).length < 15,
+    spirits: ['wittgenstein', 'borges'],
+    weight: 1,
+    description: 'universal-claim',
+  },
+
+  // Temporal patterns
+  {
+    test: (line) => /\b(once|was|had been|before)\b/i.test(line) && /\b(now|is|becomes)\b/i.test(line),
+    spirits: ['benjamin', 'warburg', 'ibn-khaldun'],
+    weight: 2,
+    description: 'past-present-juxtaposition',
+  },
+
+  // Documentary/observational patterns (for Herzog)
+  {
+    test: (line) => {
+      // Physical description pattern: adjective + concrete noun
+      return /\b(the\s+\w+\s+(light|sound|texture|surface|face|hands|eyes|silence|noise|darkness))\b/i.test(line);
+    },
+    spirits: ['herzog', 'warburg'],
+    weight: 2,
+    description: 'sensory-observation',
+  },
+
+  // Negation patterns
+  {
+    test: (line) => {
+      const negations = (line.match(/\b(not|no|never|nothing|without|lacks|absence)\b/gi) || []).length;
+      return negations >= 2;
+    },
+    spirits: ['derrida', 'wittgenstein'],
+    weight: 2,
+    description: 'multiple-negation',
+  },
+
+  // Spatial/geometric patterns
+  {
+    test: (line) => /\b(between|among|through|across|within|inside|outside)\b/i.test(line),
+    spirits: ['simmel', 'deleuze', 'borges'],
+    weight: 1,
+    description: 'spatial-preposition',
   },
 ];
 
 /**
- * Detect which spirit is active based on multiple signals
+ * Detect which spirit is active based on structure + symbols
+ * Priority: symbol resonance > structural patterns > rotation
  */
 export function detectActiveSpirit(
   line: string,
   methods: Method[],
   state: DetectionState
 ): DetectionResult {
-  // Skip empty lines and symbols themselves
   const trimmed = line.trim();
+
+  // Skip empty lines and symbols themselves
   if (!trimmed || isTransitionalSymbol(trimmed)) {
     return { id: null, source: null };
   }
 
-  // 1. Symbol resonance (highest priority) - use recent symbol to trigger spirit
+  // 1. Symbol resonance (highest priority)
   if (state.recentSymbol) {
     const resonantMethods = methods.filter(m =>
       m.resonantSymbols.includes(state.recentSymbol!)
     );
     if (resonantMethods.length > 0) {
-      // Pick based on position for determinism, or weighted random for variety
+      // Pick randomly for variety
       const method = resonantMethods[Math.floor(Math.random() * resonantMethods.length)];
-      return { id: method.id, source: 'symbol' };
+      return { id: method.id, source: 'symbol', confidence: 0.9 };
     }
   }
 
-  // 2. Vocabulary scoring (expanded vocabulary)
-  const vocabMatch = detectByVocabulary(line, methods);
-  if (vocabMatch) {
-    return { id: vocabMatch, source: 'vocabulary' };
+  // 2. Structural pattern detection
+  const structureMatch = detectByStructure(line, methods);
+  if (structureMatch) {
+    return { id: structureMatch.id, source: 'structure', confidence: structureMatch.confidence };
   }
 
-  // 3. Structural pattern detection
-  const patternMatch = detectByPattern(line, methods);
-  if (patternMatch) {
-    return { id: patternMatch, source: 'pattern' };
-  }
-
-  // 4. Round-robin rotation (ensures abundant presence)
-  if (state.linesSinceDetection >= 3 && methods.length > 0) {
+  // 3. Round-robin rotation (ensures all spirits speak)
+  if (state.linesSinceDetection >= 4 && methods.length > 0) {
     const nextIndex = (state.lastMethodIndex + 1) % methods.length;
-    return { id: methods[nextIndex].id, source: 'rotation' };
+    return { id: methods[nextIndex].id, source: 'rotation', confidence: 0.3 };
   }
 
   return { id: null, source: null };
 }
 
 /**
- * Detect spirit by vocabulary matching (expanded + original)
+ * Detect spirit by structural patterns only
  */
-function detectByVocabulary(line: string, methods: Method[]): string | null {
-  const lower = line.toLowerCase();
-  let bestMatch: { id: string; score: number } | null = null;
-
-  for (const method of methods) {
-    let score = 0;
-
-    // Check original vocabulary (higher weight for specificity)
-    for (const word of method.vocabulary) {
-      const wordLower = word.toLowerCase();
-      if (lower.includes(wordLower)) {
-        // Original vocab words get 3 points (signature terms)
-        score += 3;
-      }
-    }
-
-    // Check expanded vocabulary
-    const expanded = EXPANDED_VOCABULARY[method.id] || [];
-    for (const word of expanded) {
-      const wordLower = word.toLowerCase();
-      // Use word boundary matching to avoid false positives
-      const regex = new RegExp(`\\b${wordLower}\\b`, 'i');
-      if (regex.test(line)) {
-        // Expanded vocab gets 1 point
-        score += 1;
-      }
-    }
-
-    // Lower threshold: 2 points (either 2 expanded words, or partial signature match)
-    if (score >= 2 && (!bestMatch || score > bestMatch.score)) {
-      bestMatch = { id: method.id, score };
-    }
-  }
-
-  return bestMatch?.id ?? null;
-}
-
-/**
- * Detect spirit by structural patterns
- */
-function detectByPattern(line: string, methods: Method[]): string | null {
+function detectByStructure(
+  line: string,
+  methods: Method[]
+): { id: string; confidence: number } | null {
   const methodIds = new Set(methods.map(m => m.id));
   const scores: Record<string, number> = {};
+  let maxPossibleScore = 0;
 
   for (const pattern of STRUCTURAL_PATTERNS) {
     if (pattern.test(line)) {
       for (const spirit of pattern.spirits) {
-        // Only count if this spirit is among the summoned methods
         if (methodIds.has(spirit)) {
           scores[spirit] = (scores[spirit] || 0) + pattern.weight;
         }
       }
+      maxPossibleScore += pattern.weight;
     }
   }
 
-  // Return the highest scoring spirit if any scored
   const entries = Object.entries(scores);
   if (entries.length === 0) return null;
 
+  // Sort by score, highest first
   entries.sort((a, b) => b[1] - a[1]);
-  return entries[0][0];
+
+  const [topId, topScore] = entries[0];
+
+  // Require minimum score of 2 to avoid false positives
+  if (topScore < 2) return null;
+
+  // Calculate confidence based on score relative to theoretical max
+  const confidence = Math.min(topScore / 6, 0.85);  // Cap at 0.85
+
+  return { id: topId, confidence };
+}
+
+/**
+ * Enhanced structural detection using compiled signatures
+ * Used when spirits have compiled.json with structuralSignature
+ */
+export function detectBySignature(
+  line: string,
+  spiritSignatures: Map<string, StructuralSignature>
+): { id: string; confidence: number } | null {
+  const words = line.trim().split(/\s+/);
+  const wordCount = words.length;
+  const commas = (line.match(/,/g) || []).length;
+  const punctDensity = commas / Math.max(wordCount, 1);
+
+  const scores: { id: string; score: number }[] = [];
+
+  for (const [id, sig] of spiritSignatures) {
+    let score = 0;
+
+    // Match sentence length
+    if (sig.sentenceLength === 'short' && wordCount <= 10) score += 2;
+    if (sig.sentenceLength === 'long' && wordCount >= 25) score += 2;
+    if (sig.sentenceLength === 'medium' && wordCount > 10 && wordCount < 25) score += 1;
+    if (sig.sentenceLength === 'varied') score += 0.5; // Always partial match
+
+    // Match punctuation density
+    if (sig.punctuationDensity === 'sparse' && punctDensity < 0.1) score += 1;
+    if (sig.punctuationDensity === 'dense' && punctDensity > 0.2) score += 1;
+    if (sig.punctuationDensity === 'moderate' && punctDensity >= 0.1 && punctDensity <= 0.2) score += 0.5;
+
+    // Check rhetorical moves
+    for (const move of sig.rhetoricalMoves) {
+      if (move === 'aphorism' && wordCount <= 10 && line.endsWith('.')) score += 1;
+      if (move === 'accumulation' && commas >= 3) score += 1;
+      if (move === 'interrogation' && line.includes('?')) score += 1;
+      if (move === 'juxtaposition' && /not\s+\w+\s+but/.test(line)) score += 2;
+    }
+
+    if (score > 0) {
+      scores.push({ id, score });
+    }
+  }
+
+  if (scores.length === 0) return null;
+
+  scores.sort((a, b) => b.score - a.score);
+  const best = scores[0];
+
+  if (best.score < 2) return null;
+
+  return { id: best.id, confidence: Math.min(best.score / 5, 0.8) };
 }
 
 /**
@@ -269,6 +327,7 @@ export function createDetectionState(): DetectionState {
     recentSymbol: null,
     linesSinceDetection: 0,
     lastMethodIndex: -1,
+    depthLevel: 0,
   };
 }
 
@@ -284,7 +343,7 @@ export function updateDetectionState(
   const trimmed = line.trim();
   const isSymbol = isTransitionalSymbol(trimmed);
 
-  // Update recent symbol
+  // Update recent symbol (cleared if not a symbol line)
   const recentSymbol = isSymbol ? trimmed : null;
 
   // Update lines since detection
@@ -297,9 +356,63 @@ export function updateDetectionState(
     if (idx >= 0) lastMethodIndex = idx;
   }
 
+  // Depth escalation: increase when symbol detected (signals deeper possession)
+  let depthLevel = state.depthLevel;
+  if (isSymbol && result.id && state.depthLevel < 2) {
+    depthLevel = state.depthLevel + 1;
+  }
+
   return {
     recentSymbol,
     linesSinceDetection,
     lastMethodIndex,
+    depthLevel,
   };
+}
+
+/**
+ * Update detection metrics based on result
+ */
+export function updateDetectionMetrics(
+  metrics: DetectionMetrics,
+  result: DetectionResult,
+  state: DetectionState,
+  prevState: DetectionState
+): void {
+  if (result.source === 'symbol') {
+    metrics.symbolDetections++;
+  } else if (result.source === 'structure') {
+    metrics.structureDetections++;
+  } else if (result.source === 'rotation') {
+    metrics.rotationDetections++;
+  }
+
+  // Track depth escalations
+  if (state.depthLevel > prevState.depthLevel) {
+    metrics.depthEscalations++;
+  }
+}
+
+/**
+ * Check if depth should escalate (for progressive disclosure)
+ */
+export function shouldEscalateDepth(
+  state: DetectionState,
+  result: DetectionResult,
+  line: string
+): boolean {
+  // Escalate when:
+  // 1. Symbol detected after content (signals transition into deeper possession)
+  // 2. Multiple consecutive detections of same spirit
+  // 3. High confidence structural match
+
+  if (isTransitionalSymbol(line.trim())) {
+    return state.depthLevel < 2;
+  }
+
+  if (result.source === 'symbol' && result.confidence && result.confidence > 0.8) {
+    return state.depthLevel < 2;
+  }
+
+  return false;
 }

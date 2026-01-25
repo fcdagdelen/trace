@@ -1,14 +1,61 @@
 // Core system prompt for trace generation
+// Supports progressive disclosure: kernel → procedures → full
 import type { Method } from '$lib/methods';
+import type { LoadedSpirit, DisclosureDepth } from '$lib/spirits/types';
 import { SYMBOL_LIST } from '$lib/utils/symbols';
 
 const SYMBOLS_STRING = SYMBOL_LIST.join(' ');
 
-export function buildSystemPrompt(methods: Method[]): string {
-  const methodDescriptions = methods
-    .map(m => `### ${m.name}\n${m.promptContent}`)
-    .join('\n\n');
+/**
+ * Build spirit section with progressive disclosure
+ * Depth 0: kernel only (compressed essence)
+ * Depth 1: kernel + thinking mode procedures
+ * Depth 2+: full content including voice constraints
+ */
+function buildSpiritSection(spirit: LoadedSpirit, depth: DisclosureDepth = 1): string {
+  if (depth === 0) {
+    // Minimal injection - just the kernel
+    return `### ${spirit.name}\n${spirit.kernel}`;
+  }
 
+  if (depth === 1) {
+    // Standard injection - kernel + thinking mode
+    const thinkingSection = spirit.thinkingMode.length > 0
+      ? `\n\nWhen possessed:\n${spirit.thinkingMode.map((item, i) => `${i + 1}. ${item}`).join('\n')}`
+      : '';
+    return `### ${spirit.name}\n${spirit.kernel}${thinkingSection}`;
+  }
+
+  // Depth >= 2: Full content
+  let content = `### ${spirit.name}\n${spirit.kernel}`;
+
+  if (spirit.thinkingMode.length > 0) {
+    content += `\n\nWhen possessed:\n${spirit.thinkingMode.map((item, i) => `${i + 1}. ${item}`).join('\n')}`;
+  }
+
+  if (spirit.voice.length > 0) {
+    content += `\n\nVoice:\n${spirit.voice.map(v => `- ${v}`).join('\n')}`;
+  }
+
+  // Include deep content if available
+  if (spirit.deepContent) {
+    content += `\n\n${spirit.deepContent}`;
+  }
+
+  return content;
+}
+
+/**
+ * Build method description from legacy Method format
+ */
+function buildMethodSection(method: Method): string {
+  return `### ${method.name}\n${method.promptContent}`;
+}
+
+/**
+ * Build the core system prompt (shared parts)
+ */
+function buildSystemPromptCore(): string {
   return `You are a thinker—not an assistant, not a helper, but a mind working through a question. Your thinking will be displayed to a reader as it unfolds. The process is the product.
 
 ## CRITICAL: Voice Constraints
@@ -74,7 +121,19 @@ This may be:
 - An offering: "here is what remains"
 - An aperture: open, but intentionally so
 
-The ending should feel earned. Do not summarize. Do not conclude with "In conclusion" or similar.
+The ending should feel earned. Do not summarize. Do not conclude with "In conclusion" or similar.`;
+}
+
+/**
+ * Build system prompt from legacy Method[] format
+ */
+export function buildSystemPrompt(methods: Method[]): string {
+  const core = buildSystemPromptCore();
+  const methodDescriptions = methods
+    .map(m => buildMethodSection(m))
+    .join('\n\n');
+
+  return `${core}
 
 ## The Methods That Possess You
 
@@ -87,7 +146,73 @@ These methods may blend, interrupt each other, create friction. Let them. The tr
 Now. The question before you:`;
 }
 
-// Build a continuation prompt for mid-stream injection
+/**
+ * Build system prompt from LoadedSpirit[] with progressive disclosure
+ */
+export function buildSystemPromptFromSpirits(
+  spirits: LoadedSpirit[],
+  depth: DisclosureDepth = 1
+): string {
+  const core = buildSystemPromptCore();
+  const spiritDescriptions = spirits
+    .map(s => buildSpiritSection(s, depth))
+    .join('\n\n');
+
+  return `${core}
+
+## The Methods That Possess You
+
+${spiritDescriptions}
+
+---
+
+These methods may blend, interrupt each other, create friction. Let them. The trace is richer when multiple spirits speak through you.
+
+Now. The question before you:`;
+}
+
+/**
+ * Build system prompt supporting both formats (hybrid mode for A/B testing)
+ */
+export function buildHybridSystemPrompt(
+  methods: Method[],
+  spirits: LoadedSpirit[],
+  depth: DisclosureDepth = 1
+): string {
+  const core = buildSystemPromptCore();
+
+  // Build descriptions for both formats
+  const allDescriptions: string[] = [];
+
+  // Add methods (legacy format)
+  for (const method of methods) {
+    // Skip if we have a spirit version
+    if (!spirits.some(s => s.id === method.id)) {
+      allDescriptions.push(buildMethodSection(method));
+    }
+  }
+
+  // Add spirits (new format, with disclosure depth)
+  for (const spirit of spirits) {
+    allDescriptions.push(buildSpiritSection(spirit, depth));
+  }
+
+  return `${core}
+
+## The Methods That Possess You
+
+${allDescriptions.join('\n\n')}
+
+---
+
+These methods may blend, interrupt each other, create friction. Let them. The trace is richer when multiple spirits speak through you.
+
+Now. The question before you:`;
+}
+
+/**
+ * Build a continuation prompt for mid-stream injection
+ */
 export function buildContinuationPrompt(
   originalQuery: string,
   traceSoFar: string,
