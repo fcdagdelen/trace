@@ -183,6 +183,91 @@
     };
     return badges[source] || '';
   }
+
+  let copyStatus = $state<'idle' | 'copied'>('idle');
+
+  function formatTraceForExport(trace: TraceState): string {
+    return trace.lines.map(line => line.content).join('\n');
+  }
+
+  function formatMetricsForExport(metrics: TraceMetrics | null): string {
+    if (!metrics) return 'No metrics available';
+    return `Symbol detections: ${metrics.symbolDetections}
+Structure detections: ${metrics.structureDetections}
+Rotation detections: ${metrics.rotationDetections}
+Depth escalations: ${metrics.depthEscalations}`;
+  }
+
+  async function copyForAnalysis() {
+    const methodNames = selectedMethods.map(id =>
+      availableMethods.find(m => m.id === id)?.name || id
+    ).join(', ');
+
+    const exportText = `# A/B Test Export for AI Analysis
+
+## Test Configuration
+
+**Query:** ${query}
+
+**Selected Methods:** ${methodNames}
+
+**Spirits with Skills.md format:** ${selectedMethods.filter(id => availableMethods.find(m => m.id === id)?.hasSkills).join(', ') || 'None'}
+
+---
+
+## FORMAT A: JSON (Legacy Format)
+
+This trace was generated using the traditional JSON-based spirit definitions.
+The spirit prompts are stored as flat JSON objects with vocabulary arrays for detection.
+
+### Metrics
+${formatMetricsForExport(jsonTrace.metrics)}
+
+### Trace Output
+${formatTraceForExport(jsonTrace)}
+
+---
+
+## FORMAT B: Skills.md (New Format)
+
+This trace was generated using the new skills.md format with YAML frontmatter.
+Spirit definitions use structured markdown with:
+- YAML frontmatter for metadata (symbols, domains, compatibility)
+- Kernel section (compressed essence)
+- Thinking Mode section (numbered procedures)
+- Voice section (stylistic constraints)
+
+Detection uses structural patterns only (no vocabulary matching).
+
+### Metrics
+${formatMetricsForExport(skillsTrace.metrics)}
+
+### Trace Output
+${formatTraceForExport(skillsTrace)}
+
+---
+
+## Analysis Request
+
+Please compare the two traces above and analyze:
+1. **Content quality**: Which trace demonstrates deeper, more coherent thinking?
+2. **Spirit embodiment**: Which better captures the essence of the selected methods without naming them?
+3. **Stylistic consistency**: Which maintains more consistent voice and rhythm?
+4. **Detection accuracy**: Based on the metrics, which detection approach seems more effective?
+5. **Overall preference**: Which trace would you prefer as a reader, and why?
+`;
+
+    try {
+      await navigator.clipboard.writeText(exportText);
+      copyStatus = 'copied';
+      setTimeout(() => {
+        copyStatus = 'idle';
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+      alert('Failed to copy to clipboard');
+    }
+  }
 </script>
 
 <svelte:head>
@@ -225,13 +310,23 @@
       </div>
     </div>
 
-    <button
-      class="run-button"
-      onclick={runBothTraces}
-      disabled={isRunning || selectedMethods.length === 0}
-    >
-      {isRunning ? 'Running...' : 'Run A/B Test'}
-    </button>
+    <div class="button-row">
+      <button
+        class="run-button"
+        onclick={runBothTraces}
+        disabled={isRunning || selectedMethods.length === 0}
+      >
+        {isRunning ? 'Running...' : 'Run A/B Test'}
+      </button>
+
+      <button
+        class="copy-button"
+        onclick={copyForAnalysis}
+        disabled={jsonTrace.status !== 'complete' || skillsTrace.status !== 'complete'}
+      >
+        {copyStatus === 'copied' ? 'Copied!' : 'Copy for AI Analysis'}
+      </button>
+    </div>
   </section>
 
   <section class="comparison">
@@ -414,8 +509,13 @@
     letter-spacing: 0.05em;
   }
 
-  .run-button {
+  .button-row {
+    display: flex;
+    gap: 1rem;
     margin-top: 1rem;
+  }
+
+  .run-button {
     padding: 0.75rem 2rem;
     background: #333;
     color: white;
@@ -431,6 +531,26 @@
   }
 
   .run-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .copy-button {
+    padding: 0.75rem 1.5rem;
+    background: #2d4a3e;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .copy-button:hover:not(:disabled) {
+    background: #3d5a4e;
+  }
+
+  .copy-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
