@@ -15,6 +15,9 @@ export interface DetectionState {
   linesSinceDetection: number;
   lastMethodIndex: number;
   depthLevel: number;  // For progressive disclosure tracking
+  // Spirit momentum: keep the current spirit for several lines
+  currentSpiritId: string | null;
+  spiritMomentum: number;  // Lines remaining for current spirit
 }
 
 export interface DetectionMetrics {
@@ -187,7 +190,10 @@ const STRUCTURAL_PATTERNS: StructuralPattern[] = [
 
 /**
  * Detect which spirit is active based on structure + symbols
- * Priority: symbol resonance > structural patterns > rotation
+ * Priority: momentum > symbol resonance > structural patterns > rotation
+ *
+ * Spirits have "momentum" - once detected, they stay active for several lines
+ * to allow for more coherent, immersive possession.
  */
 export function detectActiveSpirit(
   line: string,
@@ -201,13 +207,30 @@ export function detectActiveSpirit(
     return { id: null, source: null };
   }
 
-  // 1. Symbol resonance (highest priority)
+  // 0. Spirit momentum - current spirit stays active if it has momentum
+  // Only strong signals (symbols) can interrupt momentum
+  if (state.currentSpiritId && state.spiritMomentum > 0) {
+    // Check if symbol triggers a DIFFERENT spirit (can interrupt)
+    if (state.recentSymbol) {
+      const resonantMethods = methods.filter(m =>
+        m.resonantSymbols.includes(state.recentSymbol!) && m.id !== state.currentSpiritId
+      );
+      if (resonantMethods.length > 0) {
+        // Symbol interrupts current spirit with a different one
+        const method = resonantMethods[Math.floor(Math.random() * resonantMethods.length)];
+        return { id: method.id, source: 'symbol', confidence: 0.9 };
+      }
+    }
+    // No interruption - continue with current spirit
+    return { id: state.currentSpiritId, source: 'structure', confidence: 0.7 };
+  }
+
+  // 1. Symbol resonance (highest priority for starting new possession)
   if (state.recentSymbol) {
     const resonantMethods = methods.filter(m =>
       m.resonantSymbols.includes(state.recentSymbol!)
     );
     if (resonantMethods.length > 0) {
-      // Pick randomly for variety
       const method = resonantMethods[Math.floor(Math.random() * resonantMethods.length)];
       return { id: method.id, source: 'symbol', confidence: 0.9 };
     }
@@ -220,7 +243,8 @@ export function detectActiveSpirit(
   }
 
   // 3. Round-robin rotation (ensures all spirits speak)
-  if (state.linesSinceDetection >= 4 && methods.length > 0) {
+  // Increased threshold since spirits now persist longer
+  if (state.linesSinceDetection >= 8 && methods.length > 0) {
     const nextIndex = (state.lastMethodIndex + 1) % methods.length;
     return { id: methods[nextIndex].id, source: 'rotation', confidence: 0.3 };
   }
@@ -319,6 +343,10 @@ export function detectBySignature(
   return { id: best.id, confidence: Math.min(best.score / 5, 0.8) };
 }
 
+// Minimum lines a spirit stays active once detected
+const SPIRIT_MOMENTUM_MIN = 4;
+const SPIRIT_MOMENTUM_MAX = 8;
+
 /**
  * Create initial detection state
  */
@@ -328,6 +356,8 @@ export function createDetectionState(): DetectionState {
     linesSinceDetection: 0,
     lastMethodIndex: -1,
     depthLevel: 0,
+    currentSpiritId: null,
+    spiritMomentum: 0,
   };
 }
 
@@ -362,11 +392,35 @@ export function updateDetectionState(
     depthLevel = state.depthLevel + 1;
   }
 
+  // Spirit momentum management
+  let currentSpiritId = state.currentSpiritId;
+  let spiritMomentum = state.spiritMomentum;
+
+  if (result.id) {
+    if (result.id !== state.currentSpiritId) {
+      // New spirit detected - reset momentum
+      currentSpiritId = result.id;
+      // Random momentum between min and max for variety
+      spiritMomentum = SPIRIT_MOMENTUM_MIN + Math.floor(Math.random() * (SPIRIT_MOMENTUM_MAX - SPIRIT_MOMENTUM_MIN + 1));
+    } else {
+      // Same spirit continues - decrement momentum
+      spiritMomentum = Math.max(0, state.spiritMomentum - 1);
+    }
+  } else {
+    // No detection this line
+    spiritMomentum = Math.max(0, state.spiritMomentum - 1);
+    if (spiritMomentum === 0) {
+      currentSpiritId = null;
+    }
+  }
+
   return {
     recentSymbol,
     linesSinceDetection,
     lastMethodIndex,
     depthLevel,
+    currentSpiritId,
+    spiritMomentum,
   };
 }
 

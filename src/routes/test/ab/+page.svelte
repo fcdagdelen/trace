@@ -185,6 +185,27 @@
   }
 
   let copyStatus = $state<'idle' | 'copied'>('idle');
+  let downloadStatus = $state<'idle' | 'downloaded'>('idle');
+
+  /**
+   * Generate a content-relevant filename from the query
+   * Takes first few meaningful words, strips punctuation, joins with hyphens
+   */
+  function generateFilename(queryText: string): string {
+    // Extract meaningful words (skip very short ones and common words)
+    const stopWords = new Set(['what', 'does', 'it', 'to', 'the', 'a', 'an', 'is', 'are', 'how', 'why', 'when', 'where', 'who']);
+    const words = queryText
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')  // Remove punctuation
+      .split(/\s+/)
+      .filter(w => w.length > 2 && !stopWords.has(w))
+      .slice(0, 4);  // Take first 4 meaningful words
+
+    const slug = words.length > 0 ? words.join('-') : 'trace';
+    const timestamp = new Date().toISOString().slice(0, 10);  // YYYY-MM-DD
+
+    return `ab-test-${slug}-${timestamp}.md`;
+  }
 
   function formatTraceForExport(trace: TraceState): string {
     return trace.lines.map(line => line.content).join('\n');
@@ -268,6 +289,84 @@ Please compare the two traces above and analyze:
       alert('Failed to copy to clipboard');
     }
   }
+
+  function downloadForAnalysis() {
+    const methodNames = selectedMethods.map(id =>
+      availableMethods.find(m => m.id === id)?.name || id
+    ).join(', ');
+
+    const exportText = `# A/B Test Export for AI Analysis
+
+## Test Configuration
+
+**Query:** ${query}
+
+**Selected Methods:** ${methodNames}
+
+**Spirits with Skills.md format:** ${selectedMethods.filter(id => availableMethods.find(m => m.id === id)?.hasSkills).join(', ') || 'None'}
+
+---
+
+## FORMAT A: JSON (Legacy Format)
+
+This trace was generated using the traditional JSON-based spirit definitions.
+The spirit prompts are stored as flat JSON objects with vocabulary arrays for detection.
+
+### Metrics
+${formatMetricsForExport(jsonTrace.metrics)}
+
+### Trace Output
+${formatTraceForExport(jsonTrace)}
+
+---
+
+## FORMAT B: Skills.md (New Format)
+
+This trace was generated using the new skills.md format with YAML frontmatter.
+Spirit definitions use structured markdown with:
+- YAML frontmatter for metadata (symbols, domains, compatibility)
+- Kernel section (compressed essence)
+- Thinking Mode section (numbered procedures)
+- Voice section (stylistic constraints)
+
+Detection uses structural patterns only (no vocabulary matching).
+
+### Metrics
+${formatMetricsForExport(skillsTrace.metrics)}
+
+### Trace Output
+${formatTraceForExport(skillsTrace)}
+
+---
+
+## Analysis Request
+
+Please compare the two traces above and analyze:
+1. **Content quality**: Which trace demonstrates deeper, more coherent thinking?
+2. **Spirit embodiment**: Which better captures the essence of the selected methods without naming them?
+3. **Stylistic consistency**: Which maintains more consistent voice and rhythm?
+4. **Detection accuracy**: Based on the metrics, which detection approach seems more effective?
+5. **Overall preference**: Which trace would you prefer as a reader, and why?
+`;
+
+    // Create blob and download
+    const blob = new Blob([exportText], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const filename = generateFilename(query);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    downloadStatus = 'downloaded';
+    setTimeout(() => {
+      downloadStatus = 'idle';
+    }, 2000);
+  }
 </script>
 
 <svelte:head>
@@ -325,6 +424,14 @@ Please compare the two traces above and analyze:
         disabled={jsonTrace.status !== 'complete' || skillsTrace.status !== 'complete'}
       >
         {copyStatus === 'copied' ? 'Copied!' : 'Copy for AI Analysis'}
+      </button>
+
+      <button
+        class="download-button"
+        onclick={downloadForAnalysis}
+        disabled={jsonTrace.status !== 'complete' || skillsTrace.status !== 'complete'}
+      >
+        {downloadStatus === 'downloaded' ? 'Downloaded!' : 'Download .md'}
       </button>
     </div>
   </section>
@@ -551,6 +658,26 @@ Please compare the two traces above and analyze:
   }
 
   .copy-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .download-button {
+    padding: 0.75rem 1.5rem;
+    background: #744210;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .download-button:hover:not(:disabled) {
+    background: #8a5218;
+  }
+
+  .download-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
