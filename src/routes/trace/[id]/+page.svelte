@@ -7,7 +7,7 @@
   import LegendHud from '$lib/components/LegendHud.svelte';
   import { exportToPdf } from '$lib/utils/export';
   import { formatLargeInput } from '$lib/utils/truncate';
-  import { getMethod } from '$lib/methods';
+  import { getMethodAsync, type Method } from '$lib/methods';
   import type { Trace, TraceLine as TraceLineType, TraceInjection } from '$lib/types/database';
 
   let trace = $state<Trace | null>(null);
@@ -35,16 +35,32 @@
   // Format query for display (truncate if large)
   const formattedQuery = $derived(formatLargeInput(trace?.query || ''));
 
+  // Methods map for display
+  let methodsMap = $state<Map<string, Method>>(new Map());
+
+  // Load methods for display when lines change
+  async function loadMethodsForLines() {
+    const methodIds = new Set<string>();
+    lines.forEach(line => {
+      if (line.method_hint) methodIds.add(line.method_hint);
+    });
+
+    const newMap = new Map<string, Method>();
+    for (const id of methodIds) {
+      const method = await getMethodAsync(id);
+      if (method) {
+        newMap.set(id, method);
+      }
+    }
+    methodsMap = newMap;
+  }
+
   // Derive unique methods used in this trace
   const usedMethods = $derived(() => {
-    const methodSet = new Set<string>();
-    lines.forEach(line => {
-      if (line.method_hint) methodSet.add(line.method_hint);
-    });
-    return Array.from(methodSet).map(id => ({
+    return Array.from(methodsMap.entries()).map(([id, method]) => ({
       id,
-      method: getMethod(id),
-    })).filter(m => m.method);
+      method,
+    }));
   });
 
   async function loadTrace() {
@@ -63,6 +79,8 @@
       injections = data.injections || [];
       // Show all lines initially
       displayedLines = lines;
+      // Load methods for display
+      await loadMethodsForLines();
     } catch (e) {
       error = e instanceof Error ? e.message : 'Unknown error';
     } finally {
@@ -242,6 +260,7 @@
             />
           {:else}
             <TraceLine
+              lineId={line.id}
               content={line.content}
               methodHint={line.method_hint}
               depth={line.depth || 0}

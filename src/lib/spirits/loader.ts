@@ -1,7 +1,6 @@
-// Unified spirit loader - loads from both JSON (legacy) and skills.md (new) formats
+// Spirit loader - loads from skills.md format
 import { parseSpirit, spiritToPromptContent, type ParsedSpirit } from './parser';
 import type { LoadedSpirit, CompiledSpirit, SpiritLoadOptions, DisclosureDepth, TransmutationProtocol } from './types';
-import type { Method } from '$lib/methods';
 
 // Cache for loaded spirits
 const spiritCache = new Map<string, LoadedSpirit>();
@@ -98,34 +97,26 @@ export async function loadSkillsSpirit(
 }
 
 /**
- * Convert a JSON Method to LoadedSpirit format
+ * Method interface for backward compatibility with legacy code
+ * This is duplicated here to avoid circular imports with $lib/methods
  */
-export function methodToLoadedSpirit(method: Method): LoadedSpirit {
-  return {
-    id: method.id,
-    name: method.name,
-    source: method.source,
-    format: 'json',
-
-    kernel: method.promptContent.split('\n\n')[0] || method.promptContent,
-    thinkingMode: [],
-    voice: [],
-    fullPromptContent: method.promptContent,
-
-    resonantSymbols: method.resonantSymbols,
-    domains: method.domains,
-    compatibleWith: method.compatibleWith,
-    tensionsWith: method.tensionsWith,
-
-    color: method.color,
-    letterSpacing: method.letterSpacing,
-
-    hasDeepContent: false,
-  };
+interface Method {
+  id: string;
+  name: string;
+  source: string;
+  color: string;
+  letterSpacing: number;
+  resonantSymbols: string[];
+  vocabulary: string[];
+  expandedVocabulary?: string[];
+  domains: string[];
+  compatibleWith: string[];
+  tensionsWith: string[];
+  promptContent: string;
 }
 
 /**
- * Convert LoadedSpirit back to Method interface for compatibility
+ * Convert LoadedSpirit to Method interface for backward compatibility
  */
 export function loadedSpiritToMethod(spirit: LoadedSpirit): Method {
   return {
@@ -146,7 +137,6 @@ export function loadedSpiritToMethod(spirit: LoadedSpirit): Method {
 
 /**
  * Get available skills-format spirit IDs
- * In production, this would scan the spirits directory
  */
 export function getSkillsSpiritIds(): string[] {
   return [
@@ -164,34 +154,23 @@ export function hasSkillsFormat(id: string): boolean {
 }
 
 /**
- * Load spirit with format preference
+ * Load spirit by ID
+ * All spirits now use Skills.md format
  */
 export async function loadSpirit(
   id: string,
   options: SpiritLoadOptions = {}
 ): Promise<LoadedSpirit | null> {
-  const { format = 'auto', depth = 1 } = options;
+  const { depth = 1 } = options;
 
   // Check cache first
-  const cacheKey = `${id}:${format}:${depth}`;
+  const cacheKey = `${id}:${depth}`;
   if (spiritCache.has(cacheKey)) {
     return spiritCache.get(cacheKey)!;
   }
 
-  let spirit: LoadedSpirit | null = null;
-
-  if (format === 'skills' || (format === 'auto' && hasSkillsFormat(id))) {
-    spirit = await loadSkillsSpirit(id, depth);
-  }
-
-  if (!spirit && format !== 'skills') {
-    // Fall back to JSON format via methods
-    const { getMethod } = await import('$lib/methods');
-    const method = getMethod(id);
-    if (method) {
-      spirit = methodToLoadedSpirit(method);
-    }
-  }
+  // Load from Skills.md format
+  const spirit = await loadSkillsSpirit(id, depth);
 
   if (spirit) {
     spiritCache.set(cacheKey, spirit);
@@ -201,7 +180,7 @@ export async function loadSpirit(
 }
 
 /**
- * Load multiple spirits with format preference
+ * Load multiple spirits
  */
 export async function loadSpirits(
   ids: string[],

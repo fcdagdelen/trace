@@ -3,12 +3,13 @@
   import TransmutationModal from '$lib/components/TransmutationModal.svelte';
   import { getDefaultSpirits, fetchAllSpirits } from '$lib/services/spirits';
   import { createSupabaseBrowserClient } from '$lib/services/supabase';
+  import { isPaidUser } from '$lib/stores/user';
   import type { Method } from '$lib/methods';
 
   const supabase = createSupabaseBrowserClient();
 
   // State
-  let spirits = $state<Method[]>(getDefaultSpirits());
+  let spirits = $state<Method[]>([]);
   let isLoading = $state(true);
   let error = $state<string | null>(null);
   let success = $state<{ name: string; slug: string } | null>(null);
@@ -29,7 +30,7 @@
     } catch (e) {
       console.error('Failed to load spirits:', e);
       // Fall back to defaults
-      spirits = getDefaultSpirits();
+      spirits = await getDefaultSpirits();
     } finally {
       isLoading = false;
     }
@@ -81,7 +82,23 @@
   </header>
 
   <main class="main">
-    {#if isLoading}
+    {#if !$isPaidUser}
+      <!-- Paywall for free users -->
+      <div class="paywall">
+        <div class="paywall-icon">+</div>
+        <div class="paywall-text">
+          <span class="paywall-title">Spirit Transmutation</span>
+          <span class="paywall-description">
+            Combine two spirits to create a new hybrid thinker.
+            This feature is available for paid users.
+          </span>
+        </div>
+        <div class="paywall-actions">
+          <a href="/" class="action-btn">back to trace</a>
+          <button class="action-btn primary" disabled>upgrade coming soon</button>
+        </div>
+      </div>
+    {:else if isLoading}
       <div class="loading">loading spirits...</div>
     {:else if success}
       <div class="success-message">
@@ -242,5 +259,57 @@
 
   .action-btn.primary:hover {
     filter: brightness(1.1);
+  }
+
+  .action-btn.primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: none;
+  }
+
+  .paywall {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 3rem;
+    border: 1px solid var(--border-color, #333);
+    background: rgba(255, 255, 255, 0.02);
+    max-width: 400px;
+    text-align: center;
+  }
+
+  .paywall-icon {
+    font-family: var(--font-mono);
+    font-size: 3rem;
+    color: var(--muted-color, #555);
+    line-height: 1;
+    opacity: 0.5;
+  }
+
+  .paywall-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .paywall-title {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-base, 1.125rem);
+    color: var(--text-color, #e8e6e3);
+  }
+
+  .paywall-description {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm, 0.875rem);
+    color: var(--muted-color, #666);
+    line-height: 1.6;
+  }
+
+  .paywall-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
   }
 </style>

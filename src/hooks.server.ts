@@ -119,7 +119,9 @@ export const handle: Handle = async ({ event, resolve }) => {
     return response;
   }
 
-  // Allow /auth and /auth/callback without authentication
+  // Allow public routes without authentication:
+  // - /auth and /auth/callback (login flow)
+  // - /s/[slug] (public shared traces)
   return resolve(event, {
     filterSerializedResponseHeaders(name) {
       return name === 'content-range';

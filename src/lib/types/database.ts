@@ -11,6 +11,8 @@ export type Json =
 
 export type InterjectionMode = 'interrupt' | 'harmonize' | 'gesture';
 
+export type UserTier = 'free' | 'paid' | 'pro';
+
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   __InternalSupabase: {
@@ -18,6 +20,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      user_profiles: {
+        Row: {
+          id: string
+          user_id: string
+          tier: UserTier
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          tier?: UserTier
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          tier?: UserTier
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       spirits: {
         Row: {
           id: string
@@ -170,9 +196,11 @@ export type Database = {
           depth_range: unknown
           dominant_method: string | null
           id: string
+          is_public: boolean
           line_count: number | null
           method_ids: string[]
           query: string
+          share_slug: string | null
           started_at: string | null
           symbol_count: number | null
           tension_score: number | null
@@ -185,9 +213,11 @@ export type Database = {
           depth_range?: unknown
           dominant_method?: string | null
           id?: string
+          is_public?: boolean
           line_count?: number | null
           method_ids: string[]
           query: string
+          share_slug?: string | null
           started_at?: string | null
           symbol_count?: number | null
           tension_score?: number | null
@@ -200,9 +230,11 @@ export type Database = {
           depth_range?: unknown
           dominant_method?: string | null
           id?: string
+          is_public?: boolean
           line_count?: number | null
           method_ids?: string[]
           query?: string
+          share_slug?: string | null
           started_at?: string | null
           symbol_count?: number | null
           tension_score?: number | null
@@ -263,3 +295,7 @@ export type TraceInjectionInsert = Database['public']['Tables']['trace_injection
 export type Spirit = Database['public']['Tables']['spirits']['Row'];
 export type SpiritInsert = Database['public']['Tables']['spirits']['Insert'];
 export type SpiritUpdate = Database['public']['Tables']['spirits']['Update'];
+
+export type UserProfile = Database['public']['Tables']['user_profiles']['Row'];
+export type UserProfileInsert = Database['public']['Tables']['user_profiles']['Insert'];
+export type UserProfileUpdate = Database['public']['Tables']['user_profiles']['Update'];

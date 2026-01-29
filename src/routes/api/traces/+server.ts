@@ -2,8 +2,94 @@
 // Returns paginated list of user's traces with optional filtering
 
 import type { RequestHandler } from './$types';
+import { dev } from '$app/environment';
 
-export const GET: RequestHandler = async ({ url, locals }) => {
+// Mock data for dev mode
+const MOCK_TRACES = [
+  {
+    id: 'mock-1',
+    query: 'What does it mean to truly see something?',
+    method_ids: ['herzog', 'benjamin', 'barthes'],
+    line_count: 47,
+    symbol_count: 8,
+    dominant_method: 'herzog',
+    total_duration_ms: 12500,
+    created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+  },
+  {
+    id: 'mock-2',
+    query: 'How does memory shape identity?',
+    method_ids: ['benjamin', 'borges', 'flusser'],
+    line_count: 62,
+    symbol_count: 11,
+    dominant_method: 'benjamin',
+    total_duration_ms: 18200,
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+  },
+  {
+    id: 'mock-3',
+    query: 'What is the relationship between chaos and order?',
+    method_ids: ['bateson', 'deleuze', 'grothendieck'],
+    line_count: 55,
+    symbol_count: 9,
+    dominant_method: 'bateson',
+    total_duration_ms: 15800,
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
+  },
+  {
+    id: 'mock-4',
+    query: 'What makes a place feel like home?',
+    method_ids: ['simmel', 'ibn-khaldun', 'calasso'],
+    line_count: 41,
+    symbol_count: 7,
+    dominant_method: 'simmel',
+    total_duration_ms: 11200,
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+  },
+  {
+    id: 'mock-5',
+    query: 'How do we know what we know?',
+    method_ids: ['wittgenstein', 'derrida', 'warburg'],
+    line_count: 73,
+    symbol_count: 14,
+    dominant_method: 'wittgenstein',
+    total_duration_ms: 22100,
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
+  },
+];
+
+export const GET: RequestHandler = async ({ url, locals, cookies }) => {
+  // Dev bypass mode - return mock data
+  const devBypass = dev && cookies.get('dev_bypass_auth') === '1';
+
+  if (devBypass) {
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 50);
+    const offset = parseInt(url.searchParams.get('offset') || '0');
+    const search = url.searchParams.get('search') || '';
+    const method = url.searchParams.get('method') || '';
+
+    let filtered = [...MOCK_TRACES];
+
+    if (search) {
+      filtered = filtered.filter(t =>
+        t.query.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+
+    if (method) {
+      filtered = filtered.filter(t => t.method_ids.includes(method));
+    }
+
+    return new Response(JSON.stringify({
+      traces: filtered.slice(offset, offset + limit),
+      total: filtered.length,
+      limit,
+      offset,
+    }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const session = await locals.getSession();
 
   if (!session?.user?.id) {

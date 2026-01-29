@@ -34,7 +34,7 @@ export interface LoadedSpirit {
   id: string;
   name: string;
   source: string;
-  format: 'json' | 'skills';
+  format: 'skills';
 
   // Core content
   kernel: string;
@@ -65,6 +65,6 @@ export interface LoadedSpirit {
 export type DisclosureDepth = 0 | 1 | 2;
 
 export interface SpiritLoadOptions {
-  format?: 'json' | 'skills' | 'auto';
+  format?: 'skills';  // Only skills format now supported
   depth?: DisclosureDepth;
 }

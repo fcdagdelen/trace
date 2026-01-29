@@ -5,7 +5,7 @@
 - **Test ID**: 16
 - **Query**: Why do images haunt us?
 - **Slug**: images-haunt
-- **Timestamp**: 2026-01-25T13:10:22.003Z
+- **Timestamp**: 2026-01-25T21:37:08.456Z
 - **Methods**: herzog, benjamin, wittgenstein
 
 ---
@@ -13,359 +13,371 @@
 ## FORMAT A: JSON (Legacy)
 
 ### Metrics
-- Symbol detections: 0
-- Structure detections: 61
-- Rotation detections: 0
-- Depth escalations: 0
+- Symbol detections: 24
+- Structure detections: 29
+- Rotation detections: 1
+- Depth escalations: 2
 
 ### Spirit Flow
-wittgenstein: 3 lines
-wittgenstein: 2 lines
-benjamin: 2 lines
+herzog: 4 lines
+herzog: 3 lines
+benjamin: 3 lines
+benjamin: 1 lines
+benjamin: 1 lines
 benjamin: 4 lines
 wittgenstein: 5 lines
-wittgenstein: 1 lines
-benjamin: 2 lines
-benjamin: 3 lines
-benjamin: 1 lines
-benjamin: 4 lines
-benjamin: 3 lines
-benjamin: 2 lines
 wittgenstein: 3 lines
-wittgenstein: 2 lines
-benjamin: 1 lines
+wittgenstein: 1 lines
+benjamin: 5 lines
+wittgenstein: 4 lines
+herzog: 5 lines
+herzog: 2 lines
+benjamin: 5 lines
+benjamin: 2 lines
 benjamin: 3 lines
-wittgenstein: 2 lines
-wittgenstein: 1 lines
-wittgenstein: 1 lines
-wittgenstein: 4 lines
-wittgenstein: 1 lines
-wittgenstein: 4 lines
-benjamin: 1 lines
-benjamin: 4 lines
-wittgenstein: 2 lines
+herzog: 3 lines
 
 ### Output
-An image arrives without permission.
-It settles behind the eyes like sediment in still water.
-Years pass, and there it remains—a face glimpsed in a crowd, the particular quality of afternoon light through hospital windows, the way someone's hand moved while speaking.
+An image settles in the mind like sediment in still water.
+It does not announce its arrival or justify its presence.
+One day you realize it has been there all along, organizing other thoughts around itself like iron filings around a magnet.
 
-The image does not announce its significance.
-It simply persists.
+The haunting begins with recognition that comes too late.
+You see a photograph of your grandfather's hands and understand something about your own gestures that was always true but never visible.
+The image does not create the truth—it reveals what was already arranged, waiting.
 
 
 ◊
 
 
-Consider the photograph you cannot throw away though you no longer remember why you kept it.
-A stranger's child on a swing, perhaps, or an empty chair in a garden you visited once.
-The image has severed itself from context, from narrative, from the moment that produced it.
-What remains is pure presence—the fact that this existed, once, in light.
+We mistake haunting for memory, but they move in opposite directions.
+Memory reaches backward, trying to reconstruct what happened.
+The haunting image reaches forward, colonizing future seeing.
+You cannot unsee your mother's face in a stranger on the subway once the resemblance declares itself.
 
-The haunting begins where memory fails.
-If we could perfectly reconstruct the circumstances, catalog every detail, explain the chain of associations, the image would dissolve back into information.
-But images resist such accounting.
-They preserve what cannot be spoken.
+The image that haunts is never the one you chose to remember.
+It chooses you.
+It arrives unbidden: the quality of afternoon light through hospital blinds, the way someone's hand looked holding a coffee cup, the exact angle of a child's head bent over a book.
+These fragments break away from their original context and begin their own life.
 
 
 ※
 
 
-The universe captures light and throws most of it away.
-Only the smallest fraction encounters a surface that holds it long enough to become visible.
-An image is light that has been trapped, made to confess what it has touched.
+Consider the photograph that will not leave you alone.
+Not the formal portrait, carefully composed, but the accidental capture—someone caught between expressions, a gesture half-completed.
+The haunting lives in what the image cannot quite contain.
+The visible points toward something that exceeds the frame.
 
-We are animals that see.
-Before language, before thought, before the elaborate machinery of consciousness—sight.
-The retina burns patterns into the nervous system with each blink.
-Most fade immediately, lost in the constant flood of sensation.
-But some images anchor themselves differently, embed in deeper strata.
-
-
-◊
+This is why tourist photographs rarely haunt.
+They document presence: I was here, I saw this.
+But the haunting image documents absence—what cannot be recovered, what was always already disappearing even as it appeared.
+The ghost is not what remains but what was never fully present to begin with.
 
 
-The haunting image always carries time folded within itself.
-Not the measurable time of clocks but the lived time of bodies aging, seasons turning, possibilities closing.
-In the image, all of this becomes simultaneous.
+⊹
 
-A child's face in an old photograph contains the knowledge of its own aging.
-The viewer supplies this future the image cannot hold.
-The haunting is this tension between what is preserved and what is lost to time.
+
+The image works like a key cut for a lock you did not know existed.
+It fits perfectly into some unconscious apparatus for making sense of the world.
+Once inserted, it opens chambers you never knew were sealed.
+Suddenly you understand why certain streets have always made you uneasy, why particular seasons carry weight you could never name.
+
+The haunted image is over-determined.
+It carries more meaning than its content should allow.
+A child's red coat becomes the entire weight of innocence and its violation.
+A man's shadow on a wall contains all the loneliness you have ever felt.
+The image becomes a vessel for feelings that were searching for form.
 
 
 ∘
 
 
-Images haunt because they are evidence without testimony.
-They prove something happened but cannot say what it meant.
-A bombed building, a wedding dress, tire tracks in mud—each insists on its own reality but remains mute about significance.
+We haunt ourselves with images because we are the kind of beings who live simultaneously in presence and representation.
+The dog sees the stick; we see the stick and the image of throwing it and the memory of yesterday's throw and the concept of play itself.
+Consciousness is already haunted—doubled, echoing, never quite present to itself.
 
-We project meaning onto images and then forget we have done so.
-The meaning appears to emanate from the image itself, to be discovered rather than created.
-This false certainty is part of the haunting.
-The image seems to know something we have forgotten.
-
-
-⁂
-
-
-But perhaps the deepest haunting comes from recognition.
-In certain images we glimpse not the foreign but the familiar made strange.
-Our own face reflected in a store window, caught unaware.
-The realization that this is how we appear to others—as an image among images, a visible thing in the world.
-
-The camera captures what the eye editing itself cannot see.
-It preserves the pause between expressions, the gesture half-completed, the moment before the mask reassembles.
-In these suspended instants, we encounter ourselves as others encounter us—as phenomena in space, surfaces that reflect light.
-
-
-∴
-
-
-Images accumulate like archaeological layers.
-Each new one settles over the previous, but never completely obscuring.
-Sometimes an older image breaks through—triggered by a scent, a particular slant of shadow, the echo of a voice.
-
-The past announces itself through the present image.
-Time collapses.
-For an instant, what was and what is occupy the same space.
-
-
-◌
-
-
-The truly haunting image contains its own forgetting.
-It preserves the moment while erasing everything that led to it and followed from it.
-Context bleeds away, leaving only the isolated fact of appearance.
-
-A woman laughing, but we will never know at what.
-A door standing open, but we cannot see what lies beyond.
-The image becomes pure surface, pure event.
-This incompleteness is not a flaw but its power.
-
-
-⟡
-
-
-We are haunted because we, too, are images.
-Our bodies cast shadows, reflect light, register on the retinas of others.
-We exist partially as visual phenomena—shapes moving through space, colors and textures arranged temporarily in human form.
-
-The haunting image reminds us that we are visible.
-That our interiority, however rich, produces no mark on the world except through these external signs.
-We haunt each other simply by appearing.
-
-
-∿
-
-
-The image that haunts most persistently is often the one glimpsed accidentally.
-Not the posed portrait or the carefully composed scene, but the peripheral vision of something half-seen.
-A figure disappearing around a corner.
-The shadow of a bird passing overhead.
-These images haunt because they preserve mystery intact.
-
-They maintain the possibility that meaning exists just beyond the frame.
-That if we could have seen a moment longer, looked a degree to the left, the secret would have revealed itself.
-The haunting is this eternal almost.
-
-
-∎
-
-
-In dreams, images appear without optical cause.
-Memory generates light, populates space, creates the appearance of seeing without eyes.
-These phantom images sometimes possess more reality than waking sight.
-They organize themselves according to desire and fear rather than physics.
-
-Perhaps all haunting images partake of this dream logic.
-They follow the laws of significance rather than causation.
-They appear when needed, fade when their work is done.
-They are evidence that consciousness itself is a kind of seeing—not passive reception but active creation.
+Images give this doubling a place to settle.
+They become the external correlate of internal multiplicity.
+The photograph on your desk is not just paper and light—it is the intersection point where past and present recognize each other and refuse to be reconciled.
 
 
 ◈
 
 
-The image endures because it asks nothing of us except witness.
-It makes no argument, demands no response.
-It simply continues to exist, to be available for encounter.
-In a world of constant becoming, the image offers the strange gift of being.
+The most persistent hauntings begin in childhood, when the apparatus of interpretation is still forming.
+The child encounters images before developing defenses against them.
+A face glimpsed in a crowd, a shadow moving across a bedroom wall, the particular green of summer leaves—these settle into the foundation of seeing.
+Later experiences will be filtered through these primal images.
+Every forest will be measured against that first forest; every authority figure will bear traces of that first recognition of power.
 
-What haunts us is this: the proof that moments can be held.
-That the flow of time admits interruption.
-That something, once illuminated, might persist beyond its circumstances.
+The child's image-world operates by different logic.
+Metaphor and reality have not yet been separated.
+The face in the tree bark is not like a face—it is a face.
+This pre-rational registration creates the deepest hauntings because it predates the defenses of literal thinking.
 
-The haunting image is time's rebellion against itself.
+
+∿
+
+
+Technology amplifies the haunting by making images too available.
+The photograph that once required pilgrimage to encounter—kept in a drawer, pulled out on particular occasions—now flickers past in an endless stream.
+But proliferation does not diminish haunting; it creates new forms of it.
+The image you scroll past without stopping continues its work below the threshold of attention.
+Your unconscious has been photographed.
+
+Digital images haunt differently because they exist everywhere and nowhere.
+They have no weight, no texture, no singular location.
+Yet they achieve a kind of omnipresence that physical photographs never could.
+The face from your past appears without warning in a social media feed, perfectly preserved, completely displaced from time.
+
+
+⁂
+
+
+The image that haunts us carries our death within it.
+Not literally—though sometimes literally—but structurally.
+It shows us something we can never possess completely, never exhaust through looking.
+It promises revelation and withholds it simultaneously.
+The haunting image is always dying, always preserving itself in its dying.
+
+This is why we return to it compulsively.
+Not because it gives us what we want, but because it holds the exact shape of what we cannot have.
+It becomes the perfect container for all our impossible longings—for return, for permanence, for presence that does not fade.
+
+The image haunts us because we are beings who live in time but dream of escaping it.
+Every photograph is a séance, every reflection a conversation with the dead.
+We haunt ourselves with images because we cannot bear being present to ourselves without mediation.
+
+
+∎
+
+
+Here, then, is what remains: the image as evidence of our essential displacement.
+We do not inhabit the world directly but through the accumulated fragments of seeing that have shaped our capacity to see.
+The haunting image is not an invader but a revelation of what was always true—that consciousness is a haunted house, that seeing is always re-seeing, that presence is always already shadowed by its own absence.
+
+The question is not why images haunt us, but how we could expect to live any other way.
 
 ---
 
 ## FORMAT B: Skills.md (New)
 
 ### Metrics
-- Symbol detections: 0
-- Structure detections: 29
+- Symbol detections: 20
+- Structure detections: 23
 - Rotation detections: 2
-- Depth escalations: 0
+- Depth escalations: 2
 
 ### Spirit Flow
 wittgenstein: 1 lines
 wittgenstein: 1 lines
 wittgenstein: 1 lines
 wittgenstein: 1 lines
+benjamin: 1 lines
+benjamin: 1 lines
+benjamin: 1 lines
+wittgenstein: 1 lines
+wittgenstein: 1 lines
+wittgenstein: 1 lines
+wittgenstein: 1 lines
+wittgenstein: 1 lines
+wittgenstein: 1 lines
+wittgenstein: 1 lines
+benjamin: 1 lines
+benjamin: 1 lines
 herzog: 1 lines
 herzog: 1 lines
 herzog: 1 lines
 herzog: 1 lines
-benjamin: 1 lines
-benjamin: 1 lines
-benjamin: 1 lines
-benjamin: 1 lines
-wittgenstein: 1 lines
-wittgenstein: 1 lines
-wittgenstein: 1 lines
-wittgenstein: 1 lines
-wittgenstein: 1 lines
-wittgenstein: 1 lines
-wittgenstein: 1 lines
-wittgenstein: 1 lines
-wittgenstein: 1 lines
-wittgenstein: 1 lines
-wittgenstein: 1 lines
 wittgenstein: 1 lines
 wittgenstein: 1 lines
 wittgenstein: 1 lines
 benjamin: 1 lines
 benjamin: 1 lines
+benjamin: 1 lines
+wittgenstein: 1 lines
+wittgenstein: 1 lines
+herzog: 1 lines
+herzog: 1 lines
+herzog: 1 lines
+herzog: 1 lines
+herzog: 1 lines
+benjamin: 1 lines
+benjamin: 1 lines
+benjamin: 1 lines
+benjamin: 1 lines
+benjamin: 1 lines
+benjamin: 1 lines
 wittgenstein: 1 lines
 wittgenstein: 1 lines
 wittgenstein: 1 lines
+wittgenstein: 1 lines
+herzog: 1 lines
+herzog: 1 lines
 
 ### Output
-Something persists beyond the moment of looking.
+An image arrives and will not leave.
 
-The image arrives, is seen, supposedly passes—yet continues its work in darker chambers.
+It settles behind the eyelids like sediment, accumulating weight with each return.
 
-Not memory exactly, though memory carries it.
-
-Not meaning, though meaning accretes around it.
-
-The image operates like a frequency that matches some resonant cavity in consciousness, setting up vibrations that refuse to dampen.
+We think we see pictures, but pictures see through us.
 
 
 ◊
 
 
-Consider the photograph discovered in a used book.
+The photograph of the migrant mother, dust-worn and staring past the frame.
 
-A woman in a summer dress, 1962, standing beside a car that no longer exists on a street that has been paved over.
+Her gaze does not meet ours but passes through us toward something we cannot locate.
 
-She is laughing at something outside the frame.
+We are transparent to her looking.
 
-We know nothing of her story, yet the image establishes residency.
+The image persists not because we remember it but because it remembers something in us.
 
-It begins furnishing a room we didn't know we had.
+
+⊹
+
+
+What makes an image adhesive to consciousness?
+
+Not beauty—plenty of beautiful things slide away without trace.
+
+Not shock—the mind develops calluses against repeated trauma.
+
+Something else: the image catches on an unhealed place, a question we carry without knowing we carry it.
+
+The haunting image always arrives as recognition of what we could not previously name.
 
 
 ∘
 
 
-The haunting begins with incompletion.
+Consider the cave paintings at Lascaux, those bison frozen mid-gallop in ochre and charcoal.
 
-Every image truncates the world, creates an edge where continuation is implied but withheld.
+Thirty thousand years between their making and our seeing.
 
-The woman's laughter suggests a joke we will never hear.
+The artist's hand, pressing pigment into limestone, reaching across an incomprehensible gulf of time.
 
-The light falling across her shoulder comes from a sun that set decades ago, yet persists in silver halide crystals, in pixels, in the strange permanence of the provisional moment.
+We stand in the flickering light and something ancient stirs—not nostalgia but a more fundamental resonance.
+
+The image carries the ghost of its making, the trace of breath that guided the hand.
 
 
-◊
+◌
 
 
-What haunts is not the thing depicted but the gesture of depiction itself.
+Images haunt because they are always already ghosts.
 
-Someone stood here, aimed here, pressed here.
+The moment captured is already gone.
 
-The image is evidence of attention—that most mysterious human capacity.
+The light that touched the lens has traveled from its source and died.
 
-Attention leaves traces.
+What we see is the afterimage of the world, a luminous residue.
 
-The photographer's intent becomes a kind of ghost in the machine, a residual purpose that outlasts its maker.
+Photography promises presence but delivers absence.
 
-We inherit not just the image but the looking, the decision to arrest this moment rather than that one.
+This is why we cannot look away—we are always mourning what we never possessed.
 
 
 ※
 
 
-In the haunting lies time's peculiar revenge.
+The recurring dream image returns with variations, like a musical theme worked through different keys.
 
-The image promises eternal presence—this will persist, this matters enough to fix—yet delivers only eternal absence.
+Always the same house, but the rooms rearrange themselves.
 
-The woman in the summer dress is more gone for being so apparently here.
+Always the same figure in the distance, but the face shifts.
 
-The paradox intensifies the haunting: presence preserved as pure absence, the there that is irrevocably not-there.
+The image insists on itself not because it is fixed but because it is inexhaustibly meaningful.
+
+Dreams are the mind's way of thinking in images, working through what cannot be worked through in words.
+
+The haunting image is thought that has not yet become conscious of itself.
 
 
-◈
+⋮
 
 
-Something in consciousness operates like photographic chemistry.
+We say images "stick" but they do more than adhere—they metabolize.
 
-Certain configurations of light and shadow find purchase in the darkroom of the mind.
+They enter the bloodstream of memory and alter the chemistry of attention.
 
-They develop slowly, emerging in the bath of attention like figures swimming up from chemical solution.
+The seen world begins to reorganize itself around their magnetic pull.
 
-The image that haunts has found the right chemistry, the particular mixture that allows it to precipitate into being again and again.
+Walking through a city after viewing Hopper's "Nighthawks," every lit window becomes a study in urban loneliness.
+
+The image has infected perception, teaching the eye to see what it was always seeing but never noticing.
 
 
 ∿
 
 
-The haunting reveals our own ghostliness.
+Some images arrive as prophecy, showing us what we will become.
 
-We who are haunted are ourselves images—formations of memory and projection, patterns that persist across the constant flux of cells and thoughts.
+The child sees a photograph of ruins and feels a strange familiarity—this is where I am going.
 
-The haunting image recognizes something of its own nature in us.
+The image reaches forward through time, calling its viewer toward an unknown destination.
 
-We are both spectral, both dependent on the machinery of attention for continued existence.
+Other images arrive as archaeology, excavating what we have been.
+
+The adult discovers a snapshot from childhood and is suddenly returned to a quality of light, a particular texture of afternoon that seemed lost forever.
+
+Time collapses. The image serves as a bridge across the chasm of forgetting.
 
 
-◊
+◈
 
 
-Perhaps what we call haunting is simply recognition.
+The image that haunts us is always more than itself.
 
-The image shows us something we already knew but had never seen.
+It carries the surplus meaning of everything it has touched—the hands that made it, the eyes that have seen it, the stories that have gathered around it like iron filings around a magnet.
 
-It provides a form for formless knowledge, a face for the faceless intuition.
+We think we are looking at a thing, but we are looking through a concentrated history.
 
-The summer dress, the laughter, the quality of light—these become ways of thinking about time, about loss, about the strange persistence of what should not persist.
+The image is a lens that focuses scattered experience into a single burning point.
+
+
+⊹
+
+
+Why this image and not that one?
+
+Why does the particular arrangement of light and shadow, figure and ground, seize us with such authority?
+
+Something in the composition mirrors the architecture of our inner life.
+
+The image shows us the shape of our own attention—how we hold center and periphery, what we push to the margins, what we allow to come forward.
+
+We recognize ourselves not in the content but in the way of seeing the image embodies.
 
 
 ∘
 
 
-The haunted image becomes a kind of tuning fork.
+The haunted image is incomplete.
 
-It continues to vibrate at its particular frequency, calling up harmonics from the depths of experience.
+It carries an unfinished question, an interrupted conversation with the world.
 
-Other images, other moments begin to resonate in sympathy.
+We return to it compulsively not because it satisfies but because it maintains a productive hunger.
 
-The woman's laughter awakens every other moment of witnessed joy, creates a constellation of attention across time.
+The image that haunts us is the image that refuses to be consumed, that preserves its mystery through every encounter.
+
+It remains inexhaustible because it participates in the inexhaustible.
 
 
-∴
+◊
 
 
-What haunts us finally is our own capacity to be haunted.
+Images haunt us because we are haunted creatures.
 
-The image reveals that consciousness is not a spotlight but a darkroom, where impressions develop according to their own mysterious chemistry.
+We live in time but dream outside it.
 
-We discover we are haunted beings, built to carry traces of what we have seen, unable to experience anything only once.
+We inhabit bodies but imagine ourselves beyond them.
 
-The image that haunts has found the secret door, the way into the chambers where everything persists, where nothing is ever finally over.
+The image offers itself as a bridge between what we are and what we sense ourselves to be—beings capable of being moved by light reflected from surfaces, touched by the trace of vanished hands.
+
+The haunting is mutual: we haunt the images that haunt us, breathing life into arrested light until it breathes back.
 
 ---
 
@@ -373,8 +385,8 @@ The image that haunts has found the secret door, the way into the chambers where
 
 | Metric | JSON | Skills |
 |--------|------|--------|
-| Symbol Detections | 0 | 0 |
-| Structure Detections | 61 | 29 |
-| Rotation Detections | 0 | 2 |
-| Depth Escalations | 0 | 0 |
+| Symbol Detections | 24 | 20 |
+| Structure Detections | 29 | 23 |
+| Rotation Detections | 1 | 2 |
+| Depth Escalations | 2 | 2 |
 

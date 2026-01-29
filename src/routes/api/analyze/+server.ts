@@ -4,7 +4,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { callClaude } from '$lib/services/claude';
-import { ANALYZE_SYSTEM_PROMPT, buildAnalyzePrompt, parseMethodSelection } from '$lib/prompts/analyze';
+import { buildAnalyzeSystemPrompt, buildAnalyzePrompt, parseMethodSelection } from '$lib/prompts/analyze';
 import { getMethods } from '$lib/methods';
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -15,16 +15,19 @@ export const POST: RequestHandler = async ({ request }) => {
       return json({ error: 'Query is required' }, { status: 400 });
     }
 
+    // Build system prompt dynamically (loads spirits)
+    const systemPrompt = await buildAnalyzeSystemPrompt();
+
     // Call Claude to select methods
     const response = await callClaude({
-      system: ANALYZE_SYSTEM_PROMPT,
+      system: systemPrompt,
       userMessage: buildAnalyzePrompt(query),
       maxTokens: 256,
     });
 
     // Parse the selection
     const methodIds = parseMethodSelection(response);
-    const selectedMethods = getMethods(methodIds);
+    const selectedMethods = await getMethods(methodIds);
 
     return json({
       methodIds,

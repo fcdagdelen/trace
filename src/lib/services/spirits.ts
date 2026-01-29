@@ -1,13 +1,10 @@
 // Spirit service - handles loading and merging of default and custom spirits
-// Default spirits come from JSON files, custom spirits from database
+// Default spirits come from Skills.md files, custom spirits from database
 
-import type { Method } from '$lib/methods';
+import { getAllMethods, getMethodIds, type Method } from '$lib/methods';
 import type { Spirit } from '$lib/types/database';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '$lib/types/database';
-
-// Import default spirits (the 12 philosophers)
-import { methods as defaultMethods } from '$lib/methods';
 
 // Re-export the Method type for convenience
 export type { Method };
@@ -30,14 +27,14 @@ export function spiritToMethod(spirit: Spirit): Method {
   };
 }
 
-// Get default spirits (synchronous, always available)
-export function getDefaultSpirits(): Method[] {
-  return defaultMethods;
+// Get default spirits (async, loads from Skills.md)
+export async function getDefaultSpirits(): Promise<Method[]> {
+  return getAllMethods();
 }
 
 // Get default spirit IDs
 export function getDefaultSpiritIds(): string[] {
-  return defaultMethods.map(m => m.id);
+  return getMethodIds();
 }
 
 // Fetch user's custom spirits from database
@@ -51,7 +48,9 @@ export async function fetchUserSpirits(
     .eq('user_id', userId);
 
   if (error) {
-    console.error('Failed to fetch user spirits:', error);
+    if (!error.message?.includes('does not exist')) {
+      console.warn('User spirits fetch:', error.message);
+    }
     return [];
   }
 
@@ -68,7 +67,9 @@ export async function fetchPublicSpirits(
     .eq('is_public', true);
 
   if (error) {
-    console.error('Failed to fetch public spirits:', error);
+    if (!error.message?.includes('does not exist')) {
+      console.warn('Public spirits fetch:', error.message);
+    }
     return [];
   }
 
@@ -80,7 +81,7 @@ export async function fetchAllSpirits(
   supabase: SupabaseClient<Database>,
   userId?: string
 ): Promise<Method[]> {
-  const defaults = getDefaultSpirits();
+  const defaults = await getDefaultSpirits();
 
   // Build query for custom spirits
   let query = supabase.from('spirits').select('*');
@@ -96,7 +97,10 @@ export async function fetchAllSpirits(
   const { data, error } = await query;
 
   if (error) {
-    console.error('Failed to fetch spirits:', error);
+    // Suppress expected errors when spirits table doesn't exist yet
+    if (!error.message?.includes('does not exist')) {
+      console.warn('Spirits fetch:', error.message);
+    }
     return defaults;
   }
 

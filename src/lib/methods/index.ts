@@ -1,4 +1,7 @@
 // Method cloud system - philosophical/analytical spirits that possess the thinking
+// Now powered by Skills.md format via spirits loader
+
+import { loadSpirits, loadSpirit, getSkillsSpiritIds, loadedSpiritToMethod } from '$lib/spirits/loader';
 
 export interface Method {
   id: string;
@@ -15,70 +18,96 @@ export interface Method {
   promptContent: string;
 }
 
-// Import all methods
-import barthes from './barthes.json';
-import warburg from './warburg.json';
-import benjamin from './benjamin.json';
-import deleuze from './deleuze.json';
-import wittgenstein from './wittgenstein.json';
-import bateson from './bateson.json';
-import simmel from './simmel.json';
-import ibnKhaldun from './ibn-khaldun.json';
-import grothendieck from './grothendieck.json';
-import calasso from './calasso.json';
-import borges from './borges.json';
-import derrida from './derrida.json';
-import herzog from './herzog.json';
-import flusser from './flusser.json';
+// Cache for loaded methods
+let methodsCache: Method[] | null = null;
 
-// The method cloud
-export const methods: Method[] = [
-  barthes,
-  warburg,
-  benjamin,
-  deleuze,
-  wittgenstein,
-  bateson,
-  simmel,
-  ibnKhaldun,
-  grothendieck,
-  calasso,
-  borges,
-  derrida,
-  herzog,
-  flusser,
-] as Method[];
+/**
+ * Get all available methods (async, loads from Skills.md format)
+ */
+export async function getAllMethods(): Promise<Method[]> {
+  if (methodsCache) {
+    return methodsCache;
+  }
 
-// Get method by ID
-export function getMethod(id: string): Method | undefined {
-  return methods.find(m => m.id === id);
+  const spiritIds = getSkillsSpiritIds();
+  const spirits = await loadSpirits(spiritIds, { format: 'skills' });
+  methodsCache = spirits.map(loadedSpiritToMethod);
+  return methodsCache;
 }
 
-// Get methods by IDs
-export function getMethods(ids: string[]): Method[] {
-  return ids.map(id => getMethod(id)).filter((m): m is Method => m !== undefined);
+/**
+ * Get method by ID (async)
+ */
+export async function getMethodAsync(id: string): Promise<Method | undefined> {
+  const spirit = await loadSpirit(id, { format: 'skills' });
+  return spirit ? loadedSpiritToMethod(spirit) : undefined;
 }
 
-// Get all method IDs
+/**
+ * Get methods by IDs (async)
+ */
+export async function getMethods(ids: string[]): Promise<Method[]> {
+  const spirits = await loadSpirits(ids, { format: 'skills' });
+  return spirits.map(loadedSpiritToMethod);
+}
+
+/**
+ * Get all method IDs
+ */
 export function getMethodIds(): string[] {
-  return methods.map(m => m.id);
+  return getSkillsSpiritIds();
 }
 
-// Get methods by domain
-export function getMethodsByDomain(domain: string): Method[] {
-  return methods.filter(m => m.domains.includes(domain));
+/**
+ * Clear the methods cache (useful for hot reload)
+ */
+export function clearMethodsCache(): void {
+  methodsCache = null;
 }
 
-// Get compatible methods for a given method
-export function getCompatibleMethods(methodId: string): Method[] {
-  const method = getMethod(methodId);
-  if (!method) return [];
-  return getMethods(method.compatibleWith);
+// Legacy synchronous functions - deprecated but kept for backward compatibility
+// These will throw if called before methods are loaded
+
+let syncMethods: Method[] = [];
+
+/**
+ * Initialize synchronous methods (call once at app startup)
+ * This allows legacy synchronous access patterns to work
+ */
+export async function initializeMethods(): Promise<void> {
+  syncMethods = await getAllMethods();
 }
 
-// Get methods that create productive tension with a given method
-export function getTensionMethods(methodId: string): Method[] {
-  const method = getMethod(methodId);
-  if (!method) return [];
-  return getMethods(method.tensionsWith);
+/**
+ * @deprecated Use getAllMethods() instead
+ * Synchronous access to methods array - requires initializeMethods() to be called first
+ */
+export function getMethodsSync(): Method[] {
+  if (syncMethods.length === 0) {
+    console.warn('[methods] getMethodsSync() called before initializeMethods()');
+  }
+  return syncMethods;
 }
+
+/**
+ * @deprecated Use getMethodAsync() instead
+ * Synchronous method lookup - requires initializeMethods() to be called first
+ */
+export function getMethod(id: string): Method | undefined {
+  return syncMethods.find(m => m.id === id);
+}
+
+// For backward compatibility with modules that import `methods` directly
+// This is a getter that returns the cached array
+export const methods: Method[] = new Proxy([] as Method[], {
+  get(target, prop) {
+    if (syncMethods.length > 0) {
+      return Reflect.get(syncMethods, prop);
+    }
+    if (prop === 'length') return 0;
+    if (prop === 'map' || prop === 'filter' || prop === 'find' || prop === 'forEach') {
+      return Reflect.get(syncMethods, prop).bind(syncMethods);
+    }
+    return Reflect.get(target, prop);
+  },
+});

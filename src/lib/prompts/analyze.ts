@@ -1,11 +1,23 @@
 // Kami-gami selection prompt - choosing which methods will possess the thinking
-import { methods, type Method } from '$lib/methods';
+import { getAllMethods, getMethodIds, type Method } from '$lib/methods';
 
-const methodSummaries = methods.map(m =>
-  `- ${m.id}: ${m.name} (${m.source}) — domains: ${m.domains.join(', ')}`
-).join('\n');
+/**
+ * Build the method summaries for the analysis prompt
+ */
+function buildMethodSummaries(methods: Method[]): string {
+  return methods.map(m =>
+    `- ${m.id}: ${m.name} (${m.source}) — domains: ${m.domains.join(', ')}`
+  ).join('\n');
+}
 
-export const ANALYZE_SYSTEM_PROMPT = `You are a curator of philosophical methods. Given a question or fragment, you select 3-5 methods that will "possess" the thinking process.
+/**
+ * Build the full system prompt for method selection (async)
+ */
+export async function buildAnalyzeSystemPrompt(): Promise<string> {
+  const methods = await getAllMethods();
+  const methodSummaries = buildMethodSummaries(methods);
+
+  return `You are a curator of philosophical methods. Given a question or fragment, you select 3-5 methods that will "possess" the thinking process.
 
 Available methods:
 ${methodSummaries}
@@ -20,6 +32,7 @@ You must respond with ONLY a JSON array of method IDs. No explanation, no commen
 Example: ["barthes", "benjamin", "deleuze"]
 
 Select 3-5 methods. No more, no less.`;
+}
 
 export function buildAnalyzePrompt(query: string): string {
   return `Question/fragment to analyze:
@@ -31,14 +44,14 @@ Respond with ONLY a JSON array of 3-5 method IDs that should possess the thinkin
 
 // Get random methods for fallback (ensures variety)
 function getRandomMethods(count: number = 3): string[] {
-  const allIds = methods.map(m => m.id);
+  const allIds = getMethodIds();
   const shuffled = [...allIds].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, Math.min(count, shuffled.length));
 }
 
 // Parse the response into method IDs
 export function parseMethodSelection(response: string): string[] {
-  const validIds = methods.map(m => m.id);
+  const validIds = getMethodIds();
 
   try {
     // Try to extract JSON array from the response

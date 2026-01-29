@@ -1,11 +1,9 @@
 // Streaming trace endpoint
-// Generates the thinking trace with selected methods
-// Supports A/B testing between JSON and skills.md spirit formats
+// Generates the thinking trace with selected spirits
 
 import type { RequestHandler } from './$types';
 import { streamMessage } from '$lib/services/claude';
-import { buildSystemPrompt, buildHybridSystemPrompt } from '$lib/prompts/system';
-import { getMethods, type Method } from '$lib/methods';
+import { buildSystemPromptFromSpirits } from '$lib/prompts/system';
 import { isTransitionalSymbol } from '$lib/utils/symbols';
 import { calculateDelay, detectClosing, type PacingContext } from '$lib/utils/pacing';
 import {
@@ -17,25 +15,20 @@ import {
   type DetectionState,
   type DetectionMetrics,
 } from '$lib/utils/detection';
-import { loadSpirits, hasSkillsFormat, loadedSpiritToMethod } from '$lib/spirits/loader';
-import type { LoadedSpirit, DisclosureDepth } from '$lib/spirits/types';
+import { loadSpirits, loadedSpiritToMethod } from '$lib/spirits/loader';
+import type { DisclosureDepth } from '$lib/spirits/types';
 import type { TraceLineInsert } from '$lib/types/database';
 import { getSupabaseAdmin } from '$lib/services/supabase-admin';
 import { dev } from '$app/environment';
 
-// Spirit format for A/B testing
-type SpiritFormat = 'json' | 'skills' | 'auto';
-
 // Session with TTL for cleanup
 interface Session {
   query: string;
-  methods: Method[];
   trace: string;
   injections: string[];
   traceId: string | null;
   createdAt: number;
   lastActivity: number;
-  spiritFormat: SpiritFormat;
 }
 
 // In-memory session store with TTL-based cleanup
@@ -88,12 +81,10 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
     query,
     methodIds,
     sessionId,
-    spiritFormat = 'auto'
   } = await request.json() as {
     query: string;
     methodIds: string[];
     sessionId: string;
-    spiritFormat?: SpiritFormat;
   };
 
   const session = await locals.getSession();
@@ -117,46 +108,21 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
     });
   }
 
-  // Load methods from legacy JSON format
-  const jsonMethods = getMethods(methodIds);
-  if (jsonMethods.length === 0) {
-    return new Response(JSON.stringify({ error: 'No valid methods selected' }), {
+  // Load spirits from Skills.md format
+  const spirits = await loadSpirits(methodIds, { depth: 1 });
+  if (spirits.length === 0) {
+    return new Response(JSON.stringify({ error: 'No valid spirits selected' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
-  // Determine which spirits should use skills format
-  const skillsSpiritIds = spiritFormat === 'json'
-    ? [] // Force all JSON
-    : methodIds.filter(id => spiritFormat === 'skills' || hasSkillsFormat(id));
+  // Convert to Method format for detection compatibility
+  const methods = spirits.map(loadedSpiritToMethod);
 
-  // Load skills-format spirits
-  let skillsSpirits: LoadedSpirit[] = [];
-  if (skillsSpiritIds.length > 0) {
-    skillsSpirits = await loadSpirits(skillsSpiritIds, { format: 'skills', depth: 1 });
-  }
-
-  // Convert skills spirits to Method format for detection compatibility
-  const skillsMethods = skillsSpirits.map(loadedSpiritToMethod);
-
-  // Merge: use skills methods for those we loaded, JSON for the rest
-  const methods: Method[] = jsonMethods.map(m => {
-    const skillsVersion = skillsMethods.find(s => s.id === m.id);
-    return skillsVersion || m;
-  });
-
-  // Build system prompt based on format
-  let systemPrompt: string;
+  // Build system prompt from spirits
   const initialDepth: DisclosureDepth = 1;
-
-  if (skillsSpirits.length > 0) {
-    // Hybrid mode: mix of skills and JSON
-    systemPrompt = buildHybridSystemPrompt(jsonMethods, skillsSpirits, initialDepth);
-  } else {
-    // Pure JSON mode
-    systemPrompt = buildSystemPrompt(jsonMethods);
-  }
+  const systemPrompt = buildSystemPromptFromSpirits(spirits, initialDepth);
 
   // Create trace record in Supabase using admin client (bypasses RLS)
   // Skip persistence in dev bypass mode without a real user
@@ -186,7 +152,7 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
       persistenceError = traceError.message;
     } else {
       traceId = generatedTraceId;
-      console.log('[trace] Created trace:', traceId, 'format:', spiritFormat);
+      console.log('[trace] Created trace:', traceId);
     }
   } else {
     // Dev bypass mode - no persistence
@@ -197,13 +163,11 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   const now = Date.now();
   sessions.set(sessionId, {
     query,
-    methods,
     trace: '',
     injections: [],
     traceId,
     createdAt: now,
     lastActivity: now,
-    spiritFormat,
   });
 
   // Ensure cleanup interval is running
@@ -220,8 +184,7 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
           traceId,
           persisted: !!traceId,
           error: persistenceError,
-          spiritFormat,
-          skillsSpirits: skillsSpiritIds,
+          spiritIds: methodIds,
         };
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(statusEvent)}\n\n`));
 
@@ -422,7 +385,6 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
           traceId,
           persisted: !!traceId && insertErrors.length === 0,
           lineCount,
-          spiritFormat,
           errors: insertErrors.length > 0 ? insertErrors : undefined,
           metrics: {
             symbolDetections: detectionMetrics.symbolDetections,

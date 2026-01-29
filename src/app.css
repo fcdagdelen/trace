@@ -1,25 +1,142 @@
 /* trace - esoteric terminal */
 /* watch thought unfold */
 
+/* ═══════════════════════════════════════════════════════════
+   DESIGN SYSTEM: "Scholarly Séance"
+   Late-night archival research meets esoteric ritual
+   ═══════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap');
+
 :root {
-  /* Colors - Deep dark terminal */
-  --bg-color: #0a0a0a;
-  --surface-color: #151515;
-  --border-color: #1f1f1f;
-  --text-color: #e8e8e8;
-  --muted-color: #6a6a6a;
-  --symbol-color: #8a8a8a;
+  /* ─────────────────────────────────────────────────────────
+     COLOR SYSTEM
+     ───────────────────────────────────────────────────────── */
+
+  /* Base palette - Deep obsidian with warmth */
+  --bg-deep: #050506;
+  --bg-color: #0a0a0b;
+  --bg-elevated: #0f0f11;
+  --surface-color: #141416;
+  --surface-elevated: #1a1a1d;
+  --border-color: #1f1f23;
+  --border-subtle: #16161a;
+  --border-strong: #2a2a30;
+
+  /* Text hierarchy */
+  --text-color: #e8e6e3;
+  --text-secondary: #b8b5b0;
+  --muted-color: #6a686a;
+  --muted-dim: #4a484a;
+  --symbol-color: #8a888a;
+
+  /* Accent - Soft ethereal blue */
   --accent-color: #8aa4ff;
+  --accent-dim: #6b8adb;
+  --accent-glow: rgba(138, 164, 255, 0.15);
+  --accent-bright: #a8c0ff;
 
-  /* Typography - Fluid scale */
-  --font-mono: 'SF Mono', 'Monaco', 'Fira Code', 'Inconsolata', monospace;
-  --font-size-base: clamp(1.125rem, 1rem + 0.5vw, 1.375rem);
-  --font-size-sm: clamp(0.875rem, 0.8rem + 0.3vw, 1rem);
-  --font-size-lg: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
+  /* Semantic colors */
+  --success-color: #7ac47a;
+  --success-dim: #5a945a;
+  --warning-color: #e4c07a;
+  --warning-dim: #b89a5a;
+  --error-color: #e57373;
+  --error-dim: #b55a5a;
 
-  /* Spacing */
+  /* Spirit glow palette (for glyphs/motifs) */
+  --glow-warm: rgba(212, 165, 116, 0.4);
+  --glow-cool: rgba(124, 161, 196, 0.4);
+  --glow-neutral: rgba(168, 168, 168, 0.4);
+
+  /* ─────────────────────────────────────────────────────────
+     TYPOGRAPHY
+     ───────────────────────────────────────────────────────── */
+
+  /* Font stacks */
+  --font-display: 'Cormorant Garamond', 'Garamond', 'Georgia', serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Fira Code', monospace;
+  --font-body: var(--font-mono);
+
+  /* Type scale - Musical ratio (minor third: 1.2) */
+  --font-size-xs: clamp(0.694rem, 0.65rem + 0.2vw, 0.75rem);
+  --font-size-sm: clamp(0.833rem, 0.78rem + 0.25vw, 0.9rem);
+  --font-size-base: clamp(1rem, 0.94rem + 0.3vw, 1.1rem);
+  --font-size-md: clamp(1.125rem, 1.05rem + 0.35vw, 1.25rem);
+  --font-size-lg: clamp(1.35rem, 1.25rem + 0.5vw, 1.5rem);
+  --font-size-xl: clamp(1.62rem, 1.5rem + 0.6vw, 1.8rem);
+  --font-size-2xl: clamp(1.944rem, 1.8rem + 0.7vw, 2.25rem);
+  --font-size-display: clamp(2.5rem, 2.2rem + 1.5vw, 3.5rem);
+
+  /* Line heights */
   --line-height: 1.7;
-  --line-height-tight: 1.5;
+  --line-height-tight: 1.4;
+  --line-height-display: 1.15;
+
+  /* Letter spacing */
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+  --tracking-wider: 0.05em;
+  --tracking-widest: 0.1em;
+
+  /* ─────────────────────────────────────────────────────────
+     SPACING SCALE
+     ───────────────────────────────────────────────────────── */
+
+  --space-3xs: 0.125rem;  /* 2px */
+  --space-2xs: 0.25rem;   /* 4px */
+  --space-xs: 0.5rem;     /* 8px */
+  --space-sm: 0.75rem;    /* 12px */
+  --space-md: 1rem;       /* 16px */
+  --space-lg: 1.5rem;     /* 24px */
+  --space-xl: 2rem;       /* 32px */
+  --space-2xl: 3rem;      /* 48px */
+  --space-3xl: 4rem;      /* 64px */
+
+  /* ─────────────────────────────────────────────────────────
+     SHADOWS & DEPTH
+     ───────────────────────────────────────────────────────── */
+
+  --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.7);
+  --shadow-glow: 0 0 20px var(--accent-glow);
+  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+
+  /* Elevation layers */
+  --elevation-1: var(--surface-color);
+  --elevation-2: var(--surface-elevated);
+  --elevation-3: #1f1f22;
+
+  /* ─────────────────────────────────────────────────────────
+     EFFECTS & TRANSITIONS
+     ───────────────────────────────────────────────────────── */
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --duration-instant: 75ms;
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --duration-slower: 600ms;
+
+  /* Blur */
+  --blur-sm: 4px;
+  --blur-md: 8px;
+  --blur-lg: 16px;
+
+  /* Border radius */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+
+  /* Grain overlay */
+  --grain-opacity: 0.03;
 }
 
 /* High contrast mode */
@@ -32,7 +149,10 @@
   }
 }
 
-/* Reset */
+/* ═══════════════════════════════════════════════════════════
+   RESET & BASE STYLES
+   ═══════════════════════════════════════════════════════════ */
+
 *,
 *::before,
 *::after {
@@ -55,30 +175,77 @@
 
 /* Base */
 html {
-  font-size: 100%; /* Respect user preferences */
+  font-size: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: var(--font-size-base);
   line-height: var(--line-height);
   color: var(--text-color);
   background: var(--bg-color);
   min-height: 100vh;
   min-height: 100dvh;
+  position: relative;
 }
 
-/* Scrollbar - hidden but functional */
+/* Film grain overlay - adds texture depth */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: var(--grain-opacity);
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Subtle vignette */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    transparent 60%,
+    rgba(0, 0, 0, 0.4) 100%
+  );
+  pointer-events: none;
+  z-index: 9998;
+}
+
+/* Hidden scrollbar - scroll works, bar invisible */
 ::-webkit-scrollbar {
   width: 0;
   height: 0;
+  display: none;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
 }
 
 /* Firefox */
 * {
   scrollbar-width: none;
+}
+
+/* For elements that need scroll but no visible bar */
+.scroll-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scroll-hidden::-webkit-scrollbar {
+  display: none;
 }
 
 /* Selection */
@@ -87,18 +254,165 @@ body {
   color: var(--bg-color);
 }
 
-/* Focus - subtle */
+/* Focus - ethereal glow */
 :focus-visible {
   outline: 1px solid var(--accent-color);
-  outline-offset: 1px;
+  outline-offset: 2px;
+  box-shadow: var(--shadow-glow);
 }
 
 /* Links */
 a {
   color: var(--accent-color);
   text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-out);
 }
 
 a:hover {
-  text-decoration: underline;
+  color: var(--accent-bright);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   TYPOGRAPHY UTILITIES
+   ═══════════════════════════════════════════════════════════ */
+
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: var(--tracking-tight);
+}
+
+.font-display-light {
+  font-family: var(--font-display);
+  font-weight: 300;
+  letter-spacing: var(--tracking-tight);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+  font-weight: 400;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   COMPONENT PRIMITIVES
+   ═══════════════════════════════════════════════════════════ */
+
+/* Card surface */
+.surface {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.surface-elevated {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════════════════════════ */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes breathe {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 4px var(--glow-color, var(--accent-color));
+  }
+  50% {
+    box-shadow: 0 0 12px var(--glow-color, var(--accent-color));
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* Staggered reveal utility */
+.stagger-1 { animation-delay: 50ms; }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }
+.stagger-6 { animation-delay: 300ms; }
+.stagger-7 { animation-delay: 350ms; }
+.stagger-8 { animation-delay: 400ms; }
