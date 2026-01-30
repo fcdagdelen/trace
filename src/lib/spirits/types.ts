@@ -40,6 +40,7 @@ export interface LoadedSpirit {
   kernel: string;
   thinkingMode: string[];
   voice: string[];
+  antiPatterns: string[];
   fullPromptContent: string;
 
   // Metadata

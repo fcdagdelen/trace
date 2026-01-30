@@ -70,6 +70,7 @@ export async function loadSkillsSpirit(
       kernel: parsed.kernel,
       thinkingMode: parsed.thinkingMode,
       voice: parsed.voice,
+      antiPatterns: parsed.antiPatterns,
       fullPromptContent: spiritToPromptContent(parsed, depth),
 
       resonantSymbols: parsed.meta.resonantSymbols,

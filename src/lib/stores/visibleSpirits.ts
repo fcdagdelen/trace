@@ -1,40 +1,31 @@
-// Store for tracking which spirits are currently visible in the viewport
-// Used by TraceLine (reports visibility) and LegendHud (displays visible spirits)
+// Store for tracking which spirits have appeared during trace generation
+// Used by TraceLine (reports visibility) and LegendHud (displays accumulated spirits)
 
-import { writable, derived } from 'svelte/store';
+import { writable } from 'svelte/store';
 
-// Map of line IDs to their spirit hint (only for visible lines)
-const visibleLines = writable<Map<string, string>>(new Map());
+// Cumulative set of all spirits that have appeared in this trace
+const accumulatedSpirits = writable<Set<string>>(new Set());
 
-// Report a line becoming visible
+// Report a line becoming visible - adds spirit to cumulative set
 export function lineVisible(lineId: string, spiritHint: string | undefined) {
   if (!spiritHint) return;
-  visibleLines.update(map => {
-    const newMap = new Map(map);
-    newMap.set(lineId, spiritHint);
-    return newMap;
+  accumulatedSpirits.update(set => {
+    if (set.has(spiritHint)) return set;
+    const newSet = new Set(set);
+    newSet.add(spiritHint);
+    return newSet;
   });
 }
 
-// Report a line becoming hidden
-export function lineHidden(lineId: string) {
-  visibleLines.update(map => {
-    const newMap = new Map(map);
-    newMap.delete(lineId);
-    return newMap;
-  });
+// Report a line becoming hidden - no-op, spirits persist
+export function lineHidden(_lineId: string) {
+  // Spirits accumulate and persist - don't remove
 }
 
-// Clear all visible lines (on trace reset)
+// Clear all spirits (on trace reset)
 export function clearVisibleLines() {
-  visibleLines.set(new Map());
+  accumulatedSpirits.set(new Set());
 }
 
-// Derived store: set of currently visible spirit IDs
-export const visibleSpirits = derived(visibleLines, ($visibleLines) => {
-  const spirits = new Set<string>();
-  for (const spirit of $visibleLines.values()) {
-    spirits.add(spirit);
-  }
-  return spirits;
-});
+// Export the cumulative spirits store
+export const visibleSpirits = accumulatedSpirits;

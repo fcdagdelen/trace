@@ -17,6 +17,7 @@ export interface ParsedSpirit {
   kernel: string;           // First paragraph (compressed essence)
   thinkingMode: string[];   // Numbered procedures
   voice: string[];          // Stylistic constraints
+  antiPatterns: string[];   // What NOT to do
   transmutation?: TransmutationProtocol; // Handoff rules
   fullContent: string;      // Complete markdown body
 }
@@ -213,8 +214,8 @@ function extractTransmutationProtocol(content: string): TransmutationProtocol | 
       if (currentSubsection === 'to') {
         handToWhen.push(text);
       } else if (currentSubsection === 'from') {
-        // Parse "condition → spiritName" format
-        const arrowMatch = text.match(/(.+?)\s*[→→]\s*(\w+)/);
+        // Parse "condition → spiritName" format (support hyphens in spirit names)
+        const arrowMatch = text.match(/(.+?)\s*[→→]\s*([\w-]+)/);
         if (arrowMatch) {
           handFromRules.push({
             condition: arrowMatch[1].trim(),
@@ -222,8 +223,8 @@ function extractTransmutationProtocol(content: string): TransmutationProtocol | 
           });
         }
       } else if (currentSubsection === 'hooks') {
-        // Parse "\"hook text\" (hooks spiritName)" format
-        const hookMatch = text.match(/[""](.+?)[""].*\(hooks?\s+(\w+)\)/i);
+        // Parse "\"hook text\" (hooks spiritName)" format (support hyphens in spirit names)
+        const hookMatch = text.match(/[""](.+?)[""].*\(hooks?\s+([\w-]+)\)/i);
         if (hookMatch) {
           hookLines.push({
             text: hookMatch[1].trim(),
@@ -270,6 +271,7 @@ export function parseSpirit(content: string): ParsedSpirit {
   const kernel = extractKernel(body);
   const thinkingMode = extractNumberedItems(sections['thinking-mode'] || '');
   const voice = extractBulletItems(sections['voice'] || '');
+  const antiPatterns = extractBulletItems(sections['anti-patterns'] || '');
   const transmutation = extractTransmutationProtocol(sections['transmutation-protocol'] || '');
 
   return {
@@ -277,6 +279,7 @@ export function parseSpirit(content: string): ParsedSpirit {
     kernel,
     thinkingMode,
     voice,
+    antiPatterns,
     transmutation,
     fullContent: body,
   };
@@ -291,22 +294,18 @@ export function spiritToPromptContent(spirit: ParsedSpirit, depth: number = 0): 
     return spirit.kernel;
   }
 
-  if (depth === 1) {
-    // Kernel + thinking mode
-    const thinkingSection = spirit.thinkingMode.length > 0
-      ? `\n\nWhen possessed:\n${spirit.thinkingMode.map((item, i) => `${i + 1}. ${item}`).join('\n')}`
-      : '';
-    return spirit.kernel + thinkingSection;
-  }
-
-  // Depth >= 2: Full content including voice
-  const voiceSection = spirit.voice.length > 0
-    ? `\n\nVoice:\n${spirit.voice.map(v => `- ${v}`).join('\n')}`
-    : '';
-
+  // Depth >= 1: Include thinking mode, voice, and anti-patterns
   const thinkingSection = spirit.thinkingMode.length > 0
     ? `\n\nWhen possessed:\n${spirit.thinkingMode.map((item, i) => `${i + 1}. ${item}`).join('\n')}`
     : '';
 
-  return spirit.kernel + thinkingSection + voiceSection;
+  const voiceSection = spirit.voice.length > 0
+    ? `\n\nYour Voice (shapes how each line reads):\n${spirit.voice.map(v => `- ${v}`).join('\n')}`
+    : '';
+
+  const antiPatternsSection = spirit.antiPatterns.length > 0
+    ? `\n\nNEVER do these:\n${spirit.antiPatterns.map(a => `- ${a}`).join('\n')}`
+    : '';
+
+  return spirit.kernel + thinkingSection + voiceSection + antiPatternsSection;
 }

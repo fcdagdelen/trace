@@ -81,7 +81,7 @@
     align-items: center;
     gap: var(--space-sm, 0.75rem);
     padding: var(--space-md, 1rem);
-    background: var(--surface-color, #141416);
+    background: transparent;
     border: 1px solid var(--border-color, #1f1f23);
     border-radius: var(--radius-md, 4px);
     transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
@@ -100,12 +100,26 @@
     line-height: 1.5;
     color: var(--text-color, #e8e6e3);
     background: transparent;
+    background-color: transparent;
     border: none;
+    border-radius: 0;
     resize: none;
     overflow: hidden;
     min-height: 1.5em;
     outline: none;
+    box-shadow: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
     caret-color: var(--accent-color, #8aa4ff);
+  }
+
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px transparent inset;
+    -webkit-text-fill-color: var(--text-color, #e8e6e3);
+    background-color: transparent !important;
   }
 
   textarea::placeholder {

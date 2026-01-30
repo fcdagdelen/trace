@@ -104,15 +104,15 @@
               onblur={() => hoveredSpirit = null}
               aria-label="{formatName(stat.spiritId)} - appeared in {stat.traceCount} traces"
             >
-              <!-- Emanation rings -->
-              <div class="emanation-rings" aria-hidden="true">
-                <div class="ring ring-1"></div>
-                <div class="ring ring-2"></div>
-                <div class="ring ring-3"></div>
+              <!-- Core sigil with emanation rings -->
+              <div class="sigil-core">
+                <div class="emanation-rings" aria-hidden="true">
+                  <div class="ring ring-1"></div>
+                  <div class="ring ring-2"></div>
+                  <div class="ring ring-3"></div>
+                </div>
+                <span class="sigil-glyph">{data.glyph}</span>
               </div>
-
-              <!-- Core sigil -->
-              <span class="sigil-glyph">{data.glyph}</span>
 
               <!-- Spirit name (appears on hover) -->
               <span class="sigil-name" class:visible={isHovered}>
@@ -347,12 +347,20 @@
     }
   }
 
+  /* Sigil core wrapper */
+  .sigil-core {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   /* Emanation rings */
   .emanation-rings {
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -60%);
+    transform: translate(-50%, -50%);
     pointer-events: none;
   }
 

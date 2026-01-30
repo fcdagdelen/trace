@@ -11,6 +11,8 @@ function generateShareSlug(): string {
   return randomUUID().replace(/-/g, '').slice(0, 10);
 }
 
+const MAX_SLUG_RETRIES = 3;
+
 // Make trace public
 export const POST: RequestHandler = async ({ params, locals, url }) => {
   const session = await locals.getSession();
@@ -39,18 +41,54 @@ export const POST: RequestHandler = async ({ params, locals, url }) => {
     });
   }
 
-  // Use existing slug or generate new one
-  const shareSlug = trace.share_slug || generateShareSlug();
+  // Use existing slug or generate new one with collision retry
+  let shareSlug = trace.share_slug;
+  let updateError = null;
 
-  // Update trace to be public
-  const { error: updateError } = await locals.supabase
-    .from('traces')
-    .update({
-      is_public: true,
-      share_slug: shareSlug,
-    })
-    .eq('id', id)
-    .eq('user_id', session.user.id);
+  if (!shareSlug) {
+    // Try generating a unique slug with retries
+    for (let attempt = 0; attempt < MAX_SLUG_RETRIES; attempt++) {
+      shareSlug = generateShareSlug();
+
+      const { error } = await locals.supabase
+        .from('traces')
+        .update({
+          is_public: true,
+          share_slug: shareSlug,
+        })
+        .eq('id', id)
+        .eq('user_id', session.user.id);
+
+      if (!error) {
+        updateError = null;
+        break;
+      }
+
+      // Check if it's a unique constraint violation
+      if (error.code === '23505') {
+        // Unique violation - retry with new slug
+        console.log(`[share] Slug collision on attempt ${attempt + 1}, retrying...`);
+        updateError = error;
+        continue;
+      }
+
+      // Other error - don't retry
+      updateError = error;
+      break;
+    }
+  } else {
+    // Update with existing slug
+    const { error } = await locals.supabase
+      .from('traces')
+      .update({
+        is_public: true,
+        share_slug: shareSlug,
+      })
+      .eq('id', id)
+      .eq('user_id', session.user.id);
+
+    updateError = error;
+  }
 
   if (updateError) {
     console.error('Failed to make trace public:', updateError);

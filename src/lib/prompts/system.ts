@@ -9,8 +9,8 @@ const SYMBOLS_STRING = SYMBOL_LIST.join(' ');
 /**
  * Build spirit section with progressive disclosure
  * Depth 0: kernel only (compressed essence)
- * Depth 1: kernel + thinking mode procedures
- * Depth 2+: full content including voice constraints
+ * Depth 1+: kernel + thinking mode + voice + anti-patterns
+ * Depth 2+: also includes deep content if available
  */
 function buildSpiritSection(spirit: LoadedSpirit, depth: DisclosureDepth = 1): string {
   if (depth === 0) {
@@ -18,15 +18,7 @@ function buildSpiritSection(spirit: LoadedSpirit, depth: DisclosureDepth = 1): s
     return `### ${spirit.name}\n${spirit.kernel}`;
   }
 
-  if (depth === 1) {
-    // Standard injection - kernel + thinking mode
-    const thinkingSection = spirit.thinkingMode.length > 0
-      ? `\n\nWhen possessed:\n${spirit.thinkingMode.map((item, i) => `${i + 1}. ${item}`).join('\n')}`
-      : '';
-    return `### ${spirit.name}\n${spirit.kernel}${thinkingSection}`;
-  }
-
-  // Depth >= 2: Full content
+  // Depth >= 1: Include thinking mode, voice, and anti-patterns
   let content = `### ${spirit.name}\n${spirit.kernel}`;
 
   if (spirit.thinkingMode.length > 0) {
@@ -34,11 +26,15 @@ function buildSpiritSection(spirit: LoadedSpirit, depth: DisclosureDepth = 1): s
   }
 
   if (spirit.voice.length > 0) {
-    content += `\n\nVoice:\n${spirit.voice.map(v => `- ${v}`).join('\n')}`;
+    content += `\n\nYour Voice (shapes how each line reads):\n${spirit.voice.map(v => `- ${v}`).join('\n')}`;
   }
 
-  // Include deep content if available
-  if (spirit.deepContent) {
+  if (spirit.antiPatterns.length > 0) {
+    content += `\n\nNEVER do these:\n${spirit.antiPatterns.map(a => `- ${a}`).join('\n')}`;
+  }
+
+  // Include deep content if available (depth >= 2)
+  if (depth >= 2 && spirit.deepContent) {
     content += `\n\n${spirit.deepContent}`;
   }
 
@@ -88,6 +84,8 @@ You do not say "Now I will use X method" or "Applying Y analysis." The method sp
 
 One sentence per line.
 Let each sentence breathe.
+
+The spirit possessing you shapes HOW each sentence reads—its rhythm, vocabulary, characteristic moves. A Wittgenstein line is short, declarative, ordinary. A Deleuze line flows long, accumulating with "and...and...and." But always: one thought-unit per line.
 
 Between paragraph-units (every 3-7 sentences), place a single transitional symbol on its own line—a glyph that carries the weight of the shift. Choose from:
 ${SYMBOLS_STRING}
@@ -228,4 +226,42 @@ ${traceSoFar}
 The reader's interjection: ${injection}
 
 Continue the trace, weaving in this new thread. Maintain the same format: one sentence per line, transitional symbols between paragraph-units. Do not acknowledge the interjection explicitly—just let it inflect the thinking.`;
+}
+
+export function buildBlockContinuationPrompt(params: {
+  originalQuery: string;
+  recentLines: string;
+  spiritName: string;
+  linesPerBlock: number;
+  allowClosure: boolean;
+}): string {
+  const {
+    originalQuery,
+    recentLines,
+    spiritName,
+    linesPerBlock,
+    allowClosure,
+  } = params;
+
+  const recentSection = recentLines
+    ? `Recent lines:\n${recentLines}\n`
+    : '';
+
+  const closureInstruction = allowClosure
+    ? 'If the trace feels complete, end with a settling line and then the symbol "∎" as the final line.'
+    : 'Do not conclude yet.';
+
+  return `Continue the trace.
+
+Current possession: ${spiritName}. Stay strictly in this voice for all non-symbol lines.
+
+Write exactly ${linesPerBlock} lines.
+- One sentence per line.
+- Transitional symbols must be on their own line.
+- If you include a symbol, place it as the final line of this block.
+
+${closureInstruction}
+
+Original question: ${originalQuery}
+${recentSection}Continue now.`;
 }

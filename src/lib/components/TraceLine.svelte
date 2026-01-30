@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import { getTypography } from '$lib/utils/typography';
   import { lineVisible, lineHidden } from '$lib/stores/visibleSpirits';
+  import { feedbackStore } from '$lib/stores/feedback';
+  import type { AdherenceSignal } from '$lib/types/feedback';
 
   interface Props {
     lineId: string;
@@ -13,13 +15,58 @@
     onComplete?: () => void;
     onProgress?: () => void;
     showCursor?: boolean;
+    traceId?: string | null;
   }
 
-  let { lineId, content, methodHint, depth = 0, isNew = false, typeSpeed = 25, onComplete, onProgress, showCursor = false }: Props = $props();
+  let { lineId, content, methodHint, depth = 0, isNew = false, typeSpeed = 25, onComplete, onProgress, showCursor = false, traceId = null }: Props = $props();
 
   let lineElement: HTMLDivElement;
 
   const typography = $derived(getTypography(methodHint));
+
+  // Feedback state
+  let isHovered = $state(false);
+  let hoveredIcon = $state<'up' | 'down' | null>(null);
+  let settleAnimation = $state<'up' | 'down' | null>(null);
+
+  // Get current feedback for this spirit
+  const currentFeedback = $derived.by(() => {
+    if (!traceId || !methodHint) return null;
+    let feedback: AdherenceSignal | null = null;
+    feedbackStore.subscribe(state => {
+      feedback = state.byTrace[traceId]?.[methodHint]?.signal ?? null;
+    })();
+    return feedback;
+  });
+
+  // Check if THIS line is where the feedback was clicked (primary emphasis)
+  const isClickedLine = $derived.by(() => {
+    if (!traceId || !methodHint) return false;
+    let clickedId: string | null = null;
+    feedbackStore.subscribe(state => {
+      clickedId = state.byTrace[traceId]?.[methodHint]?.clickedLineId ?? null;
+    })();
+    return clickedId === lineId;
+  });
+
+  // This spirit has feedback (for section highlighting)
+  const hasSpiritFeedback = $derived(currentFeedback !== null);
+
+  // Can show feedback controls
+  const canShowFeedback = $derived(!!methodHint && !!traceId && !isNew);
+
+  function handleFeedback(signal: AdherenceSignal) {
+    if (!traceId || !methodHint) return;
+
+    // Trigger settle animation
+    settleAnimation = signal === 1 ? 'up' : 'down';
+    setTimeout(() => {
+      settleAnimation = null;
+    }, 400);
+
+    // Submit feedback for this spirit (from this line)
+    feedbackStore.submit(traceId, lineId, methodHint, signal);
+  }
 
   // Organic indentation: combines depth with content-based variance
   const lineHash = $derived(() => {
@@ -119,6 +166,7 @@
   });
 </script>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   bind:this={lineElement}
   class="trace-line"
@@ -127,6 +175,10 @@
   class:pulse={animationClass === 'pulse' && isTyping}
   class:flicker={animationClass === 'flicker' && isTyping}
   class:float={animationClass === 'float' && isTyping}
+  class:has-feedback={canShowFeedback}
+  class:spirit-voted-up={hasSpiritFeedback && currentFeedback === 1}
+  class:spirit-voted-down={hasSpiritFeedback && currentFeedback === -1}
+  class:clicked-line={isClickedLine}
   style="
     padding-inline-start: {depthStyles.indent}em;
     filter: brightness({depthStyles.brightness});
@@ -136,6 +188,8 @@
     --settled-color: color-mix(in srgb, {typography.glowColor} 60%, var(--text-color, #e8e6e3));
     --spirit-glyph-color: {typography.glowColor};
   "
+  onmouseenter={() => isHovered = true}
+  onmouseleave={() => { isHovered = false; hoveredIcon = null; }}
 >
   {#if methodHint && isTyping}
     <span class="spirit-glyph" aria-hidden="true">{typography.glyph}</span>
@@ -143,6 +197,57 @@
   <span class="content">{displayedContent}</span>
   {#if isTyping || showCursor}
     <span class="cursor"></span>
+  {/if}
+
+  {#if canShowFeedback}
+    <span class="feedback-zone">
+      {#if methodHint && !isTyping}
+        <span class="spirit-glyph-settled" aria-hidden="true">{typography.glyph}</span>
+      {/if}
+
+      <span
+        class="feedback-icons"
+        class:visible={isHovered}
+        class:has-vote={currentFeedback !== null}
+      >
+        <button
+          class="feedback-btn up"
+          class:active={currentFeedback === 1}
+          class:hovered={hoveredIcon === 'up'}
+          class:settle={settleAnimation === 'up'}
+          onmouseenter={() => hoveredIcon = 'up'}
+          onmouseleave={() => hoveredIcon = null}
+          onclick={() => handleFeedback(1)}
+          aria-label="This feels like {methodHint}"
+          title="This feels like {methodHint}"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+          </svg>
+        </button>
+        <button
+          class="feedback-btn down"
+          class:active={currentFeedback === -1}
+          class:hovered={hoveredIcon === 'down'}
+          class:settle={settleAnimation === 'down'}
+          onmouseenter={() => hoveredIcon = 'down'}
+          onmouseleave={() => hoveredIcon = null}
+          onclick={() => handleFeedback(-1)}
+          aria-label="This doesn't feel like {methodHint}"
+          title="This doesn't feel like {methodHint}"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+          </svg>
+        </button>
+      </span>
+
+      {#if currentFeedback === 1}
+        <span class="feedback-indicator voted-up" aria-label="You found this adherent"></span>
+      {:else if currentFeedback === -1}
+        <span class="feedback-indicator voted-down" aria-label="You found this non-adherent"></span>
+      {/if}
+    </span>
   {/if}
 </div>
 
@@ -287,6 +392,223 @@
     .spirit-glyph {
       animation: none;
       opacity: 0.3;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     FEEDBACK UI
+     ═══════════════════════════════════════════════════════════ */
+
+  .feedback-zone {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    margin-inline-start: 0.75em;
+    vertical-align: middle;
+  }
+
+  .spirit-glyph-settled {
+    font-size: 0.7em;
+    color: var(--spirit-glyph-color, var(--muted-color));
+    opacity: 0.25;
+    transition: opacity 300ms ease-out;
+  }
+
+  .trace-line:hover .spirit-glyph-settled {
+    opacity: 0.5;
+  }
+
+  .feedback-indicator {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    opacity: 0.7;
+  }
+
+  .feedback-indicator.voted-up {
+    background: #6fbf73;
+    box-shadow: 0 0 4px rgba(111, 191, 115, 0.5);
+  }
+
+  .feedback-indicator.voted-down {
+    background: #e57373;
+    box-shadow: 0 0 4px rgba(229, 115, 115, 0.5);
+  }
+
+  .feedback-icons {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    opacity: 0;
+    transform: translateX(-4px);
+    transition:
+      opacity 200ms ease-out,
+      transform 200ms ease-out;
+    pointer-events: none;
+  }
+
+  .feedback-icons.visible {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+
+  .feedback-icons.has-vote {
+    opacity: 0;
+  }
+
+  .feedback-icons.visible.has-vote {
+    opacity: 0.6;
+    pointer-events: auto;
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     SPIRIT SECTION HIGHLIGHTING
+     ═══════════════════════════════════════════════════════════ */
+
+  /* Subtle highlight for all lines of a spirit with positive feedback */
+  .trace-line.spirit-voted-up {
+    background: linear-gradient(90deg, rgba(111, 191, 115, 0.06) 0%, transparent 60%);
+    border-left: 2px solid rgba(111, 191, 115, 0.25);
+    margin-left: -2px;
+    padding-left: calc(var(--current-indent, 0) + 2px);
+  }
+
+  /* Subtle highlight for all lines of a spirit with negative feedback */
+  .trace-line.spirit-voted-down {
+    background: linear-gradient(90deg, rgba(229, 115, 115, 0.06) 0%, transparent 60%);
+    border-left: 2px solid rgba(229, 115, 115, 0.25);
+    margin-left: -2px;
+    padding-left: calc(var(--current-indent, 0) + 2px);
+  }
+
+  /* Emphasized highlight for the clicked line (positive) */
+  .trace-line.spirit-voted-up.clicked-line {
+    background: linear-gradient(90deg, rgba(111, 191, 115, 0.12) 0%, transparent 70%);
+    border-left: 2px solid rgba(111, 191, 115, 0.5);
+  }
+
+  /* Emphasized highlight for the clicked line (negative) */
+  .trace-line.spirit-voted-down.clicked-line {
+    background: linear-gradient(90deg, rgba(229, 115, 115, 0.12) 0%, transparent 70%);
+    border-left: 2px solid rgba(229, 115, 115, 0.5);
+  }
+
+  .feedback-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1em;
+    height: 1.1em;
+    padding: 0;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--muted-dim, #4a484a);
+    opacity: 0.5;
+    transition:
+      color 150ms ease-out,
+      opacity 150ms ease-out,
+      transform 150ms ease-out;
+  }
+
+  .feedback-btn svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .feedback-btn:hover {
+    opacity: 1;
+  }
+
+  .feedback-btn.up:hover,
+  .feedback-btn.up.hovered {
+    color: #6fbf73;
+    filter: drop-shadow(0 0 4px rgba(111, 191, 115, 0.5));
+  }
+
+  .feedback-btn.down:hover,
+  .feedback-btn.down.hovered {
+    color: #e57373;
+    filter: drop-shadow(0 0 4px rgba(229, 115, 115, 0.5));
+  }
+
+  .feedback-btn.active {
+    opacity: 1;
+  }
+
+  .feedback-btn.up.active {
+    color: #6fbf73;
+  }
+
+  .feedback-btn.down.active {
+    color: #e57373;
+  }
+
+  /* Settle animation on click */
+  .feedback-btn.settle {
+    animation: feedbackSettle 400ms ease-out forwards;
+  }
+
+  @keyframes feedbackSettle {
+    0% {
+      transform: scale(1);
+    }
+    30% {
+      transform: scale(1.3);
+    }
+    60% {
+      transform: scale(0.9);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  .feedback-btn.up.settle {
+    animation: feedbackSettleUp 400ms ease-out forwards;
+  }
+
+  @keyframes feedbackSettleUp {
+    0% {
+      transform: scale(1);
+      color: var(--muted-dim);
+    }
+    30% {
+      transform: scale(1.3);
+      color: #6fbf73;
+      filter: drop-shadow(0 0 8px rgba(111, 191, 115, 0.7));
+    }
+    60% {
+      transform: scale(0.9);
+    }
+    100% {
+      transform: scale(1);
+      color: #6fbf73;
+    }
+  }
+
+  .feedback-btn.down.settle {
+    animation: feedbackSettleDown 400ms ease-out forwards;
+  }
+
+  @keyframes feedbackSettleDown {
+    0% {
+      transform: scale(1);
+      color: var(--muted-dim);
+    }
+    30% {
+      transform: scale(1.3);
+      color: #e57373;
+      filter: drop-shadow(0 0 8px rgba(229, 115, 115, 0.7));
+    }
+    60% {
+      transform: scale(0.9);
+    }
+    100% {
+      transform: scale(1);
+      color: #e57373;
     }
   }
 </style>

@@ -18,8 +18,6 @@ export function getSupabaseAdmin(): SupabaseClient<Database> {
       console.error('[supabase-admin] Missing env vars:', {
         hasUrl: !!url,
         hasKey: !!serviceRoleKey,
-        urlPrefix: url?.slice(0, 30),
-        keyPrefix: serviceRoleKey?.slice(0, 10),
       });
       throw new Error('PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set');
     }

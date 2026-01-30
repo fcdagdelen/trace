@@ -243,6 +243,74 @@ export type Database = {
         }
         Relationships: []
       }
+      spirit_feedback: {
+        Row: {
+          id: string
+          user_id: string | null
+          trace_id: string | null
+          spirit_id: string
+          adherence_signal: -1 | 1
+          spirit_version: string | null
+          trace_context: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          trace_id?: string | null
+          spirit_id: string
+          adherence_signal: -1 | 1
+          spirit_version?: string | null
+          trace_context?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          trace_id?: string | null
+          spirit_id?: string
+          adherence_signal?: -1 | 1
+          spirit_version?: string | null
+          trace_context?: Json
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spirit_feedback_trace_id_fkey"
+            columns: ["trace_id"]
+            isOneToOne: false
+            referencedRelation: "traces"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      spirit_feedback_aggregates: {
+        Row: {
+          spirit_id: string
+          total_feedback: number
+          positive_count: number
+          negative_count: number
+          adherence_score: number
+          last_updated: string
+        }
+        Insert: {
+          spirit_id: string
+          total_feedback?: number
+          positive_count?: number
+          negative_count?: number
+          adherence_score?: number
+          last_updated?: string
+        }
+        Update: {
+          spirit_id?: string
+          total_feedback?: number
+          positive_count?: number
+          negative_count?: number
+          adherence_score?: number
+          last_updated?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -299,3 +367,9 @@ export type SpiritUpdate = Database['public']['Tables']['spirits']['Update'];
 export type UserProfile = Database['public']['Tables']['user_profiles']['Row'];
 export type UserProfileInsert = Database['public']['Tables']['user_profiles']['Insert'];
 export type UserProfileUpdate = Database['public']['Tables']['user_profiles']['Update'];
+
+export type SpiritFeedback = Database['public']['Tables']['spirit_feedback']['Row'];
+export type SpiritFeedbackInsert = Database['public']['Tables']['spirit_feedback']['Insert'];
+export type SpiritFeedbackUpdate = Database['public']['Tables']['spirit_feedback']['Update'];
+
+export type SpiritFeedbackAggregate = Database['public']['Tables']['spirit_feedback_aggregates']['Row'];

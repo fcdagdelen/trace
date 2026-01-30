@@ -2,14 +2,23 @@
   import { onMount, tick } from 'svelte';
   import { traceStore, type TraceLine } from '$lib/stores/trace';
   import { clearVisibleLines } from '$lib/stores/visibleSpirits';
+  import { feedbackStore } from '$lib/stores/feedback';
   import TraceLineComponent from './TraceLine.svelte';
   import TransitionSymbol from './TransitionSymbol.svelte';
 
   interface Props {
     onPause?: () => void;
+    traceId?: string | null;
   }
 
-  let { onPause }: Props = $props();
+  let { onPause, traceId = null }: Props = $props();
+
+  // Load existing feedback when traceId is available
+  $effect(() => {
+    if (traceId) {
+      feedbackStore.loadForTrace(traceId);
+    }
+  });
 
   let container: HTMLDivElement;
 
@@ -143,6 +152,7 @@
           onComplete={!instantMode && line.id === typingId ? handleLineComplete : undefined}
           onProgress={!instantMode && line.id === typingId ? scrollToBottom : undefined}
           showCursor={!instantMode && !line.isSymbol && typingId === null && index === displayedLines.length - 1 && $traceStore.isStreaming}
+          {traceId}
         />
       {/if}
     </div>

@@ -12,6 +12,7 @@
   import { traceStore } from '$lib/stores/trace';
   import { sessionStore } from '$lib/stores/session';
   import { persistenceStore } from '$lib/stores/persistence';
+  import { feedbackStore } from '$lib/stores/feedback';
   import { isPaidUser } from '$lib/stores/user';
   import { getDepthDirection } from '$lib/utils/symbols';
   import { exportToPdf, exportToMarkdown, copyToClipboard } from '$lib/utils/export';
@@ -64,11 +65,6 @@
   let recoveryData = $state<RecoveryData | null>(null);
   let currentMethodIds = $state<string[]>([]);
   let currentTraceId = $state<string | null>(null);
-
-  // Share state
-  let isSharing = $state(false);
-  let shareUrl = $state<string | null>(null);
-  let shareCopied = $state(false);
 
   // Sanctuary/home state
   let showSanctuary = $state(true);
@@ -239,7 +235,12 @@
       currentMethodIds = methodIds;
 
       // Open SSE connection
-      const response = await fetch('/api/trace', {
+      const cohesionMode =
+        typeof window !== 'undefined' &&
+        new URL(window.location.href).searchParams.get('cohesion') === 'block';
+      const traceUrl = cohesionMode ? '/api/trace?cohesion=block' : '/api/trace';
+
+      const response = await fetch(traceUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -423,45 +424,6 @@
     }
   }
 
-  // Share trace publicly
-  async function handleShare() {
-    if (!currentTraceId || isSharing) return;
-
-    isSharing = true;
-
-    try {
-      const response = await fetch(`/api/traces/${currentTraceId}/share`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to share trace');
-      }
-
-      const data = await response.json();
-      shareUrl = data.shareUrl;
-    } catch (error) {
-      exportError = error instanceof Error ? error.message : 'Share failed';
-      setTimeout(() => { exportError = null; }, 5000);
-    } finally {
-      isSharing = false;
-    }
-  }
-
-  // Copy share URL to clipboard
-  async function handleCopyShareUrl() {
-    if (!shareUrl) return;
-
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      shareCopied = true;
-      setTimeout(() => { shareCopied = false; }, 2000);
-    } catch {
-      exportError = 'Failed to copy URL';
-      setTimeout(() => { exportError = null; }, 5000);
-    }
-  }
-
   // Retry saving failed trace
   async function retrySave() {
     if (!currentTraceId || $persistenceStore.status === 'saving') return;
@@ -490,12 +452,11 @@
     traceStore.reset();
     sessionStore.clear();
     persistenceStore.reset();
+    feedbackStore.reset();
     userQuery = '';
     currentDepth = 0;
     currentMethodIds = [];
     currentTraceId = null;
-    shareUrl = null;
-    shareCopied = false;
     showSanctuary = true;
     clearPartialTrace();
   }
@@ -508,11 +469,11 @@
 
 <div class="terminal">
   <header class="header">
-    <div class="header-brand">
+    <button class="header-brand" onclick={handleReset}>
       <span class="brand-glyph">◯</span>
       <span class="title">trace</span>
       <span class="version">{formattedVersion}</span>
-    </div>
+    </button>
     <div class="header-actions">
       {#if $persistenceStore.status === 'saving'}
         <span class="persistence-indicator saving">
@@ -552,17 +513,6 @@
           {isCopying}
           {copySuccess}
         />
-        {#if !$traceStore.isStreaming && currentTraceId && $persistenceStore.status === 'saved'}
-          {#if shareUrl}
-            <button class="header-btn share-active" onclick={handleCopyShareUrl} title="Copy share link">
-              {shareCopied ? 'copied!' : 'link'}
-            </button>
-          {:else}
-            <button class="header-btn" onclick={handleShare} disabled={isSharing} title="Share publicly">
-              {isSharing ? '...' : 'share'}
-            </button>
-          {/if}
-        {/if}
         <button class="header-btn" onclick={handleReset}>clear</button>
       {/if}
       <button class="header-btn logout" onclick={handleLogout} title="Sign out">exit</button>
@@ -617,7 +567,7 @@
       </div>
 
       <!-- Trace output -->
-      <TraceView onPause={handlePause} />
+      <TraceView onPause={handlePause} traceId={currentTraceId} />
     {/if}
 
     {#if $traceStore.error}
@@ -701,6 +651,17 @@
     display: flex;
     align-items: center;
     gap: var(--space-xs);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: var(--space-2xs) var(--space-xs);
+    margin: calc(-1 * var(--space-2xs)) calc(-1 * var(--space-xs));
+    border-radius: var(--radius-sm);
+    transition: background var(--duration-fast) var(--ease-out);
+  }
+
+  .header-brand:hover {
+    background: rgba(255, 255, 255, 0.04);
   }
 
   .brand-glyph {
@@ -783,11 +744,6 @@
     padding-left: var(--space-sm);
     border-left: 1px solid var(--border-color);
   }
-
-  .header-btn.share-active {
-    color: var(--accent-color);
-  }
-
 
   /* Persistence indicator */
   .persistence-indicator {
