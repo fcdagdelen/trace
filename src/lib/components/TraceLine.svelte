@@ -85,19 +85,64 @@
     return baseIndent + variance;
   });
 
+  // Typing speed constants
+  const SENTENCE_PAUSE_MULT = 3;      // Multiplier at .!?
+  const CLAUSE_PAUSE_MULT = 1.5;      // Multiplier at ,;:
+  const WORD_PAUSE_MULT = 1.1;        // Multiplier at spaces
+  const VARIANCE_MIN = 0.9;           // Random variance range
+  const VARIANCE_MAX = 1.1;
+  const LONG_LINE_THRESHOLD = 80;     // When to speed up
+  const MEDIUM_LINE_THRESHOLD = 40;
+
+  // Calculate base speed based on line length (longer = faster to avoid tedium)
+  const baseSpeed = $derived(() => {
+    if (content.length > LONG_LINE_THRESHOLD) return 20;
+    if (content.length > MEDIUM_LINE_THRESHOLD) return 25;
+    return 28;
+  });
+
   // Visual encoding based on depth
   const depthStyles = $derived({
     indent: organicIndent(),
     brightness: 0.88 + (depth * 0.03),
     weight: typography.weight + (depth * 25),
-    speed: 32 + (depth * 4),
+    speed: baseSpeed() + (depth * 4),
   });
 
   let displayedContent = $state('');
   let isTyping = $state(false);
   let typingContentId = '';
 
-  // Type out content character by character
+  // Calculate delay for a character based on the previous character (organic variance)
+  function getCharDelay(prevChar: string, speed: number): number {
+    // Pause at sentence endings
+    if ('.!?'.includes(prevChar)) return speed * SENTENCE_PAUSE_MULT;
+
+    // Brief pause at clause breaks
+    if (',;:'.includes(prevChar)) return speed * CLAUSE_PAUSE_MULT;
+
+    // Slight pause at word boundaries
+    if (prevChar === ' ') return speed * WORD_PAUSE_MULT;
+
+    // Small random variance for organic feel
+    return speed * (VARIANCE_MIN + Math.random() * (VARIANCE_MAX - VARIANCE_MIN));
+  }
+
+  // Build cumulative delay array for all characters
+  function buildDelaySchedule(text: string, speed: number): number[] {
+    const delays: number[] = [];
+    let cumulative = 0;
+
+    for (let i = 0; i < text.length; i++) {
+      const prevChar = i === 0 ? '' : text[i - 1];
+      cumulative += getCharDelay(prevChar, speed);
+      delays.push(cumulative);
+    }
+
+    return delays;
+  }
+
+  // Type out content character by character using requestAnimationFrame
   $effect(() => {
     const targetContent = content;
     const shouldType = isNew;
@@ -117,23 +162,45 @@
     isTyping = true;
     displayedContent = '';
 
-    let idx = 0;
     const speed = depthStyles.speed;
+    const delaySchedule = buildDelaySchedule(targetContent, speed);
 
-    const interval = setInterval(() => {
-      idx++;
-      displayedContent = targetContent.slice(0, idx);
-      onProgress?.();
+    let startTime: number | null = null;
+    let lastCharIndex = 0;
+    let animationId: number;
 
-      if (idx >= targetContent.length) {
-        clearInterval(interval);
+    function animateTyping(timestamp: number) {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+
+      // Find how many characters should be displayed based on elapsed time
+      let targetIndex = 0;
+      for (let i = 0; i < delaySchedule.length; i++) {
+        if (elapsed >= delaySchedule[i]) {
+          targetIndex = i + 1;
+        } else {
+          break;
+        }
+      }
+
+      if (targetIndex !== lastCharIndex) {
+        lastCharIndex = targetIndex;
+        displayedContent = targetContent.slice(0, targetIndex);
+        onProgress?.();
+      }
+
+      if (targetIndex < targetContent.length) {
+        animationId = requestAnimationFrame(animateTyping);
+      } else {
         isTyping = false;
         onComplete?.();
       }
-    }, speed);
+    }
+
+    animationId = requestAnimationFrame(animateTyping);
 
     return () => {
-      clearInterval(interval);
+      cancelAnimationFrame(animationId);
     };
   });
 

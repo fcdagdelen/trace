@@ -83,6 +83,9 @@
     typingId !== null
   );
 
+  // Inter-line breathing delay (ms)
+  const INTER_LINE_DELAY = 120;
+
   // Called when a line finishes typing
   function handleLineComplete() {
     if (instantMode) return;
@@ -92,15 +95,17 @@
 
     const storeLines = $traceStore.lines;
     if (storeLines.length > processedCount) {
-      queueMicrotask(() => {
+      // Breathing delay before starting next line
+      setTimeout(() => {
         const freshLines = $traceStore.lines;
-        if (freshLines.length > processedCount) {
+        // Only start next line if nothing else has started typing
+        if (freshLines.length > processedCount && typingId === null) {
           const nextLine = freshLines[processedCount];
           processedCount++;
           displayedLines = [...displayedLines, nextLine];
           typingId = nextLine.id;
         }
-      });
+      }, INTER_LINE_DELAY);
     }
   }
 
